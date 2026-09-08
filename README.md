@@ -179,15 +179,50 @@ await api.materials.restock('MAT-001', { addQuantity: 50, reason: 'สั่ง�
 
 ---
 
-## 🗄️ 4. ฐานข้อมูล Prisma Database Schema (`prisma/schema.prisma`)
+## 🗄️ 4. โครงสร้างฐานข้อมูล PostgreSQL (Database Schema)
 
-Schema ได้รับการจัดทำโครงสร้างครบทุก Table พร้อม Relation และ Foreign Keys:
-- **`User`** (`users`): ตารางผู้ใช้งาน, รหัสผ่าน, บทบาท 3 ระดับ, แผนก, สถานะ
-- **`Category`** (`categories`): ตารางหมวดหมู่วัสดุ
-- **`Material`** (`materials`): ตารางวัสดุ/ครุภัณฑ์, ราคา, จำนวนคงเหลือ, จุดสั่งซื้อขั้นต่ำ, ที่จัดเก็บ
-- **`Request`** (`requests`): ตารางคำขอเบิก/ยืม, สถานะ, ผู้ขอ, ผู้อนุมัติ, วันที่ยืม-คืน, เหตุผลไม่อนุมัติ
-- **`ReturnRecord`** (`return_records`): ตารางบันทึกการส่งคืน, สภาพอุปกรณ์, ผู้ตรวจรับ
-- **`ActivityLog`** (`activity_logs`): ตาราง Audit Trail ทุกกิจกรรมในระบบ
+ฐานข้อมูลจริงใช้ **PostgreSQL** ประกอบด้วย **13 ตาราง + 4 Enums** พร้อม Indexes (ไฟล์ SQL: `prisma/schema.sql`)
+
+### 📋 ตาราง 13 ตาราง
+
+| # | ตาราง | คำอธิบาย | Primary Key | Columns สำคัญ |
+| :-- | :--- | :--- | :---: | :--- |
+| 1 | `roles` | สิทธิ์/ระดับผู้ใช้งาน | `id SERIAL` | role_name(VARCHAR 50 UNIQUE), description, created_at |
+| 2 | `departments` | หน่วยงาน | `id SERIAL` | department_name(VARCHAR 150), description, created_at, updated_at |
+| 3 | `users` | ผู้ใช้งาน | `id SERIAL` | username(UNIQUE), password_hash, first_name, last_name, email(UNIQUE), phone, role_id→roles, department_id→departments, is_active |
+| 4 | `categories` | หมวดหมู่วัสดุ | `id SERIAL` | category_name(VARCHAR 150 UNIQUE), description, created_at, updated_at |
+| 5 | `materials` | วัสดุและครุภัณฑ์ | `id SERIAL` | material_code(UNIQUE), material_name, category_id→categories, item_type(วัสดุ/ครุภัณฑ์), unit, stock_quantity(≥0), minimum_stock(≥0), image_url, location, is_active |
+| 6 | `requests` | คำขอเบิก-ยืม | `id SERIAL` | request_code(UNIQUE), user_id→users, request_type(ENUM), status(ENUM), reason, borrow_date, due_date |
+| 7 | `request_items` | รายการวัสดุในคำขอ | `id SERIAL` | request_id→requests(CASCADE), material_id→materials, quantity(>0) |
+| 8 | `approvals` | ประวัติการอนุมัติ | `id SERIAL` | request_id→requests(CASCADE), approver_id→users, result(ENUM), reason, approved_at |
+| 9 | `returns` | การคืนวัสดุ | `id SERIAL` | return_code(UNIQUE), request_id→requests, user_id→users, return_date, note |
+| 10 | `return_items` | รายการวัสดุที่คืน | `id SERIAL` | return_id→returns(CASCADE), material_id→materials, quantity(>0), condition, note |
+| 11 | `stock_movements` | ประวัติเคลื่อนไหวสต็อก | `id SERIAL` | material_id→materials, movement_type(ENUM), quantity(>0), reference_id, note, created_by→users |
+| 12 | `stock_replenishments` | การเติมสต็อก | `id SERIAL` | material_id→materials, quantity(>0), supplier, reference_no, note, added_by→users |
+| 13 | `audit_logs` | ประวัติการใช้งานระบบ | `id SERIAL` | user_id→users(SET NULL), action, table_name, record_id, description, ip_address |
+
+### 🏷️ PostgreSQL Enums (4 ชุด)
+
+| Enum | ค่าที่เป็นไปได้ |
+| :--- | :--- |
+| `request_type` | `'เบิก'`, `'ยืม'` |
+| `request_status` | `'รออนุมัติ'`, `'อนุมัติ'`, `'ไม่อนุมัติ'`, `'ยกเลิก'`, `'เสร็จสิ้น'` |
+| `approval_result` | `'อนุมัติ'`, `'ไม่อนุมัติ'` |
+| `stock_movement_type` | `'เติมสต็อก'`, `'เบิก'`, `'ยืม'`, `'คืน'`, `'ปรับปรุง'` |
+
+### 🔗 ER Diagram (ความสัมพันธ์)
+
+```
+roles ──1:N──> users ──1:N──> requests ──1:N──> request_items ──N:1──> materials
+                │                │                                        │
+departments ─1:N┘                ├──1:N──> approvals                      │
+                                 │                                        │
+                                 └──1:N──> returns ──1:N──> return_items ─┘
+                                                                          │
+                                           stock_movements ──N:1──────────┘
+                                           stock_replenishments ──N:1─────┘
+                                           audit_logs ──N:1──> users
+```
 
 ---
 
@@ -257,10 +292,102 @@ npm run dev
 
 ---
 
-## 📝 7. บันทึกประวัติการพัฒนา (Development Changelog)
+## 🗄️ 8. การเชื่อมต่อฐานข้อมูล PostgreSQL (Database Connection)
+
+ระบบเชื่อมต่อกับฐานข้อมูล **PostgreSQL** ผ่าน **Prisma ORM 7** + **@prisma/adapter-pg** + **pg (node-postgres)**
+
+### 🔌 ข้อมูลการเชื่อมต่อ (Connection Details)
+
+| รายการ | ค่า |
+| :--- | :--- |
+| **Database Manager** | PostgreSQL |
+| **Host name/address** | `192.168.237.4` |
+| **Port** | `5434` |
+| **Maintenance database** | `osrs` |
+| **Username** | `osrs_user` |
+| **Password** | `7YsbD2WSvDgcP64EI3rv` |
+| **Connection String** | `postgresql://osrs_user:7YsbD2WSvDgcP64EI3rv@192.168.237.4:5434/osrs?schema=public` |
+
+### 📁 ไฟล์ที่เกี่ยวข้องกับการเชื่อมต่อ
+
+| ไฟล์ | คำอธิบาย |
+| :--- | :--- |
+| `.env` | เก็บ `DATABASE_URL` (PostgreSQL connection string) |
+| `prisma.config.ts` | กำหนด datasource URL สำหรับ Prisma CLI (Migrate, Generate) |
+| `prisma/schema.prisma` | กำหนด provider เป็น `postgresql` และโครงสร้างตาราง |
+| `src/lib/prisma.ts` | Prisma Client Singleton ใช้ `@prisma/adapter-pg` + `pg` Pool |
+
+### 🛠️ วิธีการสร้างตารางในฐานข้อมูล (Database Migration)
+
+```bash
+# 1. เข้าสู่โฟลเดอร์แอป
+cd app
+
+# 2. สร้าง Migration จาก Prisma Schema
+npx prisma migrate dev --name init
+
+# 3. หรือ Push Schema ตรงไปที่ DB (ไม่สร้าง migration file)
+npx prisma db push
+
+# 4. Generate Prisma Client
+npx prisma generate
+
+# 5. เปิด Prisma Studio ดูข้อมูลใน DB
+npx prisma studio
+```
+
+### 📦 Dependencies ที่เกี่ยวข้อง
+
+```json
+{
+  "@prisma/client": "^7.9.1",
+  "@prisma/adapter-pg": "latest",
+  "pg": "^8.23.0",
+  "prisma": "^7.9.1",
+  "dotenv": "latest"
+}
+```
+
+### 🔍 8.1 โครงสร้าง DB จริง vs Prisma Schema (8 ก.ย. 2569)
+
+ได้รับ SQL Schema ตัวเต็มจากผู้พัฒนา DB — ฐานข้อมูลจริงมี **13 ตาราง + 4 PostgreSQL Enums + 17 Indexes**
+ไฟล์ SQL ถูกบันทึกไว้ที่: `prisma/schema.sql`
+
+#### ⚠️ ข้อแตกต่างสำคัญ (Prisma Schema vs DB จริง)
+
+| ประเด็น | Prisma Schema ปัจจุบัน | DB จริง (PostgreSQL) |
+| :--- | :--- | :--- |
+| **จำนวนตาราง** | 6 ตาราง | **13 ตาราง** |
+| **Primary Key** | `String @id @default(uuid())` | `SERIAL (Integer Auto Increment)` |
+| **Naming** | camelCase (`requestId`) | snake_case (`request_id`) |
+| **Users** | fullName(1 field), role(String), department(String) | first_name + last_name, role_id→`roles`, department_id→`departments` |
+| **Roles** | String field ใน User | **แยกตาราง** `roles` (id, role_name, description) |
+| **Departments** | String field ใน User | **แยกตาราง** `departments` (id, department_name, description) |
+| **Requests** | 1 request = 1 material (materialId) | 1 request → N items ผ่านตาราง `request_items` |
+| **Request Type** | String field | **PostgreSQL Enum** `request_type` ('เบิก','ยืม') |
+| **Request Status** | String field | **PostgreSQL Enum** `request_status` (5 ค่า) |
+| **Approvals** | ฝังใน requests | **แยกตาราง** `approvals` + Enum `approval_result` |
+| **Returns** | `return_records` (1 ตาราง) | **แยก 2 ตาราง**: `returns` + `return_items` |
+| **Stock Tracking** | ไม่มี | **2 ตารางใหม่**: `stock_movements` + `stock_replenishments` |
+| **Audit Logs** | userName, action, module, type | action, table_name, record_id (ต่างกัน) |
+| **Boolean Status** | String ("ใช้งาน"/"ไม่ใช้งาน") | `BOOLEAN is_active` (true/false) |
+| **CHECK Constraints** | ไม่มี | มี (stock_quantity≥0, quantity>0 ฯลฯ) |
+
+#### 🚨 สิ่งที่ต้องดำเนินการ (TODO)
+
+1. **ปรับ Prisma Schema** — เขียนใหม่ให้ตรงกับ 13 ตาราง + 4 Enums ของ DB จริง
+2. **ปรับ API Route Handlers** — ให้ query/mutate ตรงกับโครงสร้าง DB ใหม่
+3. **ปรับ Frontend Store/Types** — ให้ interface ตรงกับ response จาก DB จริง
+4. **⛔ ห้ามใช้ `prisma migrate` หรือ `prisma db push`** — จะทำให้ตารางที่มีอยู่เสียหาย
+
+---
+
+## 📝 9. บันทึกประวัติการพัฒนา (Development Changelog)
 
 | วันที่ | รายการที่ดำเนินการ | ผู้รับผิดชอบ |
 | :--- | :--- | :--- |
+| **8 ก.ย. 2569 (SQL Schema ตัวเต็ม)** | **ได้รับและบันทึก SQL Schema ตัวเต็มของ DB จริง:**<br>1. ได้รับ SQL CREATE TABLE script จากผู้พัฒนา DB — มี 13 ตาราง + 4 PostgreSQL Enums + 17 Indexes<br>2. ตารางที่ Prisma Schema ยังไม่มี: `roles`, `departments`, `request_items`, `approvals`, `return_items`, `stock_movements`, `stock_replenishments`<br>3. บันทึก SQL ไว้ที่ `prisma/schema.sql` เป็น reference<br>4. อัปเดต README.md §4 เป็นโครงสร้าง DB จริง (13 ตาราง + ER Diagram + Enums) แทน Prisma Schema เก่า<br>5. อัปเดต README.md §8.1 เปรียบเทียบข้อแตกต่าง 15 ประเด็นระหว่าง Prisma Schema ปัจจุบัน vs DB จริง | Antigravity AI Assistant |
+| **8 ก.ย. 2569** | **เชื่อมต่อฐานข้อมูล PostgreSQL (Database Integration):**<br>1. เปลี่ยน Prisma datasource provider จาก `sqlite` เป็น `postgresql`<br>2. อัปเดต `.env` กำหนด `DATABASE_URL` ชี้ไป PostgreSQL Server (`192.168.237.4:5434/osrs`)<br>3. อัปเดต `prisma.config.ts` ให้รองรับ Prisma 7 (ย้าย URL จาก schema.prisma มาอยู่ใน config)<br>4. ติดตั้ง `@prisma/adapter-pg` สำหรับ Prisma 7 Driver Adapter<br>5. สร้าง Prisma Client Singleton (`src/lib/prisma.ts`) ใช้ `PrismaPg` adapter + `pg` Pool พร้อม Singleton Pattern ป้องกัน connection exhaustion<br>6. Generate Prisma Client สำเร็จ 100%<br>7. ⚠️ **หมายเหตุ**: การทดสอบเชื่อมต่อจากเครื่อง dev ได้ผลลัพธ์ ETIMEDOUT — อาจต้องตรวจสอบ Firewall หรือ Network ก่อนใช้งานจริง | Antigravity AI Assistant |
 | **17 ส.ค. 2569 (ปรับปรุง UI/UX)** | **ยกระดับ UI/UX แทนที่ Browser Native Alert/Confirm ด้วย Custom Modals & Toast:**<br>1. ยกเลิกการใช้ `confirm()` popup เดิมของบราวเซอร์ แล้วแทนที่ด้วยหน้าต่าง **Custom Confirmation Modal** ที่ออกแบบสวยงาม (ไอคอนแจ้งเตือน, การ์ดแสดงรหัสคำขอ/รายการวัสดุ/จำนวน/ผู้ขอ และปุ่มสไตล์ Danger/Outline)<br>2. ยกเลิกการใช้ `alert()` ในหน้ารายงาน แล้วแทนที่ด้วย **Toast Notification System** ที่ทันสมัยและนุ่มนวล<br>3. ตรวจสอบทั่วทั้งระบบ ไม่มีการใช้ popup dialog ดิบของบราวเซอร์อีกต่อไป UI กลมกลืนสวยงามระดับพรีเมียม 100% | Antigravity AI Assistant |
 | **17 ส.ค. 2569 (เพิ่มปุ่มดูข้อมูล)** | **เพิ่มฟังก์ชันและหน้าต่าง Modal "ดูข้อมูล" (Material Details Modal):**<br>1. เพิ่มปุ่มคลิก "ดูข้อมูล" (Eye Icon Button) สีน้ำเงินสวยงามในตารางคลังสินค้า (`/inventory`) และตารางจัดการวัสดุ (`/materials`) สำหรับผู้ใช้งานทุกระดับ (Admin, Approver, Staff)<br>2. สร้าง Modal แสดงรายละเอียดและสเปกวัสดุแบบครบถ้วน (ไอคอนหมวดหมู่, รหัส, ชื่อ, จำนวนคงเหลือ, เกณฑ์ขั้นต่ำแจ้งเตือน, ราคาต่อหน่วย, มูลค่ารวม, สถานที่จัดเก็บ, วันที่อัปเดตล่าสุด, และคำอธิบายสเปก)<br>3. แยกสิทธิ์ปุ่มจัดการชัดเจน: เจ้าหน้าที่และผู้อนุมัติสามารถกด "ดูข้อมูล" ได้อย่างสะดวก และแอดมินสามารถกดทั้ง "ดูข้อมูล" และ "เติมสต็อก/แก้ไข/ลบ" ได้ตามปกติ | Antigravity AI Assistant |
 | **17 ส.ค. 2569 (แก้ไข Login Match Priority)** | **แก้ไขปัญหาการแย่งสิทธิ์ค้นหาผู้ใช้ (Inactive User Collision):**<br>1. ปรับระบบการค้นหาบัญชีผู้ใช้ในหน้า Login และ Server Repository ให้ค้นหาแบบ Exact Email Match และ Exact Username Match เป็นอันดับแรก<br>2. ป้องกันไม่ให้บัญชีสถานะไม่ใช้งาน (เช่น บัญชีทดสอบที่ถูกปิดการใช้งาน) แย่งสิทธิ์การล็อกอินของบัญชีหลัก (`approver@rangsit.go.th`, `admin@rangsit.go.th`, `staff@rangsit.go.th`)<br>3. ทดสอบล็อกอินครบทั้ง 3 บทบาทผ่าน 100% ราบรื่นและแม่นยำ | Antigravity AI Assistant |

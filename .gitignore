@@ -41,3 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# sensitive files (contains DB credentials)
+README.md
+prisma/schema.sql

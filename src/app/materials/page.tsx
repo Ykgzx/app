@@ -290,7 +290,6 @@ export default function MaterialsPage() {
                 <th>หมวดหมู่</th>
                 <th>คงเหลือ</th>
                 <th>ราคา/หน่วย</th>
-                <th>มูลค่ารวม</th>
                 <th>สถานะ</th>
                 <th>การจัดการ</th>
               </tr>
@@ -337,7 +336,6 @@ export default function MaterialsPage() {
                       </div>
                     </td>
                     <td>฿{material.pricePerUnit.toLocaleString('th-TH')}</td>
-                    <td style={{ fontWeight: 700 }}>฿{material.totalValue.toLocaleString('th-TH')}</td>
                     <td>
                       <span className={`badge ${getStatusBadge(material.status)}`}>
                         {material.status}

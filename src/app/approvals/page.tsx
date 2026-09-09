@@ -43,10 +43,10 @@ export default function ApprovalsPage() {
   const [rejectReason, setRejectReason] = useState('');
   const { showToast, ToastComponent } = useToast();
 
-  if (currentUser.role === 'เจ้าหน้าที่') {
+  if (currentUser.role !== 'ผู้อนุมัติ') {
     return (
       <AppLayout title="การอนุมัติคำขอ">
-        <AccessDenied requiredRoles={['ผู้ดูแลระบบ', 'ผู้อนุมัติ']} moduleName="การอนุมัติคำขอเบิก–ยืม" />
+        <AccessDenied requiredRoles={['ผู้อนุมัติ']} moduleName="การอนุมัติคำขอเบิก–ยืม" />
       </AppLayout>
     );
   }

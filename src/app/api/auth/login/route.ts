@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serverRepository } from '@/lib/server/repository';
-import { ApiResponse, LoginRequestDto, LoginResponseDto } from '@/lib/types/api';
+import { ApiResponse, LoginResponseDto } from '@/lib/types/api';
+import { generateToken, verifyPassword, getDefaultPasswordHash } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as LoginRequestDto & { email?: string; identifier?: string };
+    const body = await req.json();
     const identifier = body.username || body.email || body.identifier;
+    const password = body.password;
 
     if (!identifier) {
       return NextResponse.json<ApiResponse>(
@@ -14,12 +16,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!password) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: 'กรุณาระบุรหัสผ่าน' },
+        { status: 400 }
+      );
+    }
+
     const user = serverRepository.getUserByUsernameOrEmail(identifier);
 
     if (!user) {
       return NextResponse.json<ApiResponse>(
-        { success: false, error: 'ไม่พบบัญชีผู้ใช้งานหรืออีเมลนี้ในระบบ' },
-        { status: 404 }
+        { success: false, error: 'อีเมล/ชื่อผู้ใช้ หรือรหัสผ่านไม่ถูกต้อง' },
+        { status: 401 }
       );
     }
 
@@ -29,6 +38,27 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       );
     }
+
+    // ตรวจสอบรหัสผ่าน
+    // ในระบบ Demo: รหัสผ่านเริ่มต้นคือ "password123" สำหรับทุกบัญชี
+    // ในระบบจริง: ควรเก็บ password_hash ในฐานข้อมูล
+    const defaultHash = await getDefaultPasswordHash();
+    const isPasswordValid = await verifyPassword(password, defaultHash);
+
+    if (!isPasswordValid) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: 'อีเมล/ชื่อผู้ใช้ หรือรหัสผ่านไม่ถูกต้อง' },
+        { status: 401 }
+      );
+    }
+
+    // สร้าง JWT Token จริง
+    const token = generateToken({
+      userId: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+    });
 
     // Log Activity
     serverRepository.createActivityLog({
@@ -40,7 +70,7 @@ export async function POST(req: NextRequest) {
     });
 
     const responseData: LoginResponseDto = {
-      token: `mock-jwt-token-${user.id}-${Date.now()}`,
+      token,
       user: {
         id: user.id,
         fullName: user.fullName,

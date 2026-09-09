@@ -53,12 +53,12 @@ export default function Sidebar() {
       href: '/approvals',
       label: 'การอนุมัติคำขอ',
       icon: ClipboardCheck,
-      roles: ['ผู้ดูแลระบบ', 'ผู้อนุมัติ'],
+      roles: ['ผู้อนุมัติ'],
       badge: 'ผู้อนุมัติ',
     },
     {
       href: '/inventory',
-      label: 'คลังสินค้าและสต็อก',
+      label: 'คลังวัสดุและครุภัณฑ์',
       icon: Package,
       roles: ['ผู้ดูแลระบบ', 'ผู้อนุมัติ', 'เจ้าหน้าที่'],
     },
@@ -98,7 +98,13 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">🏛️</div>
+        <div className="sidebar-logo-icon" style={{ padding: 0, overflow: 'hidden' }}>
+          <img
+            src="/logo-rangsit.png"
+            alt="ตราเทศบาลนครรังสิต"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+          />
+        </div>
         <div className="sidebar-logo-text">
           <h2>เทศบาลนคร<br />รังสิต</h2>
           <p>ระบบจัดการวัสดุเทศบาล</p>

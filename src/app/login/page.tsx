@@ -50,66 +50,78 @@ export default function LoginPage() {
     },
   ];
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!emailOrUsername.trim()) {
       setError('กรุณากรอกอีเมลหรือชื่อผู้ใช้งาน');
+      return;
+    }
+    if (!password.trim()) {
+      setError('กรุณากรอกรหัสผ่าน');
       return;
     }
 
     setIsLoading(true);
     setError('');
 
-    const query = emailOrUsername.trim().toLowerCase();
-    const allUsers = [...users, ...mockUsers];
+    try {
+      // เรียก Login API พร้อมรหัสผ่าน
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: emailOrUsername.trim(),
+          password: password,
+        }),
+      });
 
-    // ลำดับที่ 1: ค้นหาจาก Email ที่ตรงกันทั้งหมด (Exact Email Match)
-    let found: User | undefined = allUsers.find((u) => u.email.toLowerCase() === query);
+      const data = await res.json();
 
-    // ลำดับที่ 2: ค้นหาจาก Username ที่ตรงกัน (Exact Username Match)
-    if (!found) {
-      found = allUsers.find((u) => u.username.toLowerCase() === query);
-    }
-
-    // ลำดับที่ 3: ค้นหาจาก Role Alias เฉพาะผู้ใช้ที่สถานะ "ใช้งาน" เท่านั้น
-    if (!found) {
-      if (query === 'admin' || query.startsWith('admin@')) {
-        found = allUsers.find((u) => u.role === 'ผู้ดูแลระบบ' && u.status === 'ใช้งาน');
-      } else if (query === 'approver' || query.startsWith('approver@')) {
-        found = allUsers.find((u) => u.role === 'ผู้อนุมัติ' && u.status === 'ใช้งาน');
-      } else if (query === 'staff' || query.startsWith('staff@')) {
-        found = allUsers.find((u) => u.role === 'เจ้าหน้าที่' && u.status === 'ใช้งาน');
-      }
-    }
-
-    if (found) {
-      if (found.status === 'ไม่ใช้งาน') {
-        setError('บัญชีผู้ใช้นี้ถูกปิดการใช้งาน กรุณาติดต่อผู้ดูแลระบบ');
+      if (!res.ok || !data.success) {
+        setError(data.error || 'เข้าสู่ระบบไม่สำเร็จ');
         setIsLoading(false);
         return;
       }
 
-      setCurrentUser(found);
-      addActivityLog({
-        action: 'เข้าสู่ระบบ',
-        description: `${found.fullName} (${found.role}) เข้าสู่ระบบสำเร็จ`,
-        userName: found.fullName,
-        module: 'ระบบ',
-        type: 'เข้าสู่ระบบ',
-      });
+      // เก็บ JWT token ใน sessionStorage (ปลอดภัยกว่า localStorage)
+      if (data.data?.token) {
+        sessionStorage.setItem('auth_token', data.data.token);
+      }
+
+      // Fallback: ค้นหา user จาก store เพื่อ set currentUser
+      const query = emailOrUsername.trim().toLowerCase();
+      const allUsers = [...users, ...mockUsers];
+      let found: User | undefined = allUsers.find((u) => u.email.toLowerCase() === query);
+      if (!found) found = allUsers.find((u) => u.username.toLowerCase() === query);
+      if (!found) {
+        if (query === 'admin' || query.startsWith('admin@')) found = allUsers.find((u) => u.role === 'ผู้ดูแลระบบ' && u.status === 'ใช้งาน');
+        else if (query === 'approver' || query.startsWith('approver@')) found = allUsers.find((u) => u.role === 'ผู้อนุมัติ' && u.status === 'ใช้งาน');
+        else if (query === 'staff' || query.startsWith('staff@')) found = allUsers.find((u) => u.role === 'เจ้าหน้าที่' && u.status === 'ใช้งาน');
+      }
+
+      if (found) {
+        setCurrentUser(found);
+        addActivityLog({
+          action: 'เข้าสู่ระบบ',
+          description: `${found.fullName} (${found.role}) เข้าสู่ระบบสำเร็จ`,
+          userName: found.fullName,
+          module: 'ระบบ',
+          type: 'เข้าสู่ระบบ',
+        });
+      }
 
       setTimeout(() => {
         router.push('/');
       }, 200);
-    } else {
-      setError('ไม่พบอีเมลหรือชื่อผู้ใช้งานนี้ในระบบ');
+    } catch {
+      setError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง');
       setIsLoading(false);
     }
   };
 
   const handleSelectDemoAccount = (email: string) => {
     setEmailOrUsername(email);
-    setPassword('••••••••');
+    setPassword('password123');
     setError('');
   };
 

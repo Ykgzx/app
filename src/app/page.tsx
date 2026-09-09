@@ -12,7 +12,6 @@ import {
   FolderOpen,
   AlertTriangle,
   ClipboardCheck,
-  TrendingUp,
   Send,
   RotateCcw,
   ShieldCheck,
@@ -31,7 +30,6 @@ export default function DashboardPage() {
   const lowStockItems = materials.filter((m) => m.status === 'ใกล้หมด').length;
   const outOfStockItems = materials.filter((m) => m.status === 'หมดสต็อก').length;
   const borrowingItems = requests.filter((r) => r.status === 'กำลังยืม').length;
-  const totalValue = materials.reduce((sum, m) => sum + m.totalValue, 0);
 
   const maxWithdrawals = Math.max(...monthlyReportData.map((d) => d.withdrawals));
 
@@ -298,29 +296,6 @@ export default function DashboardPage() {
                 </div>
                 <span className="badge badge-info">บันทึกคืน</span>
               </Link>
-
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px 16px',
-                  background: 'var(--success-50)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--success-100)',
-                }}
-              >
-                <TrendingUp size={20} style={{ color: 'var(--success-600)', flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    มูลค่าทรัพย์สินคลังวัสดุ
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                    มูลค่ารวมทั้งสิ้น ฿{totalValue.toLocaleString('th-TH')} บาท
-                  </div>
-                </div>
-                <span className="badge badge-success">ปกติ</span>
-              </div>
             </div>
           </div>
         </div>

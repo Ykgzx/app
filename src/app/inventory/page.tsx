@@ -41,14 +41,24 @@ export default function InventoryPage() {
     setIsDetailModalOpen(true);
   };
 
-  const filteredMaterials = materials.filter((m) => {
-    const matchSearch =
-      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchStatus = filterStatus ? m.status === filterStatus : true;
-    return matchSearch && matchStatus;
-  });
+  const statusPriority: Record<string, number> = { 'หมดสต็อก': 0, 'ใกล้หมด': 1, 'มีสต็อก': 2 };
+
+  const filteredMaterials = materials
+    .filter((m) => {
+      const matchSearch =
+        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.location.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchStatus = filterStatus ? m.status === filterStatus : true;
+      return matchSearch && matchStatus;
+    })
+    .sort((a, b) => {
+      // เรียงสถานะ: หมดสต็อก → ใกล้หมด → มีสต็อก
+      const priorityDiff = (statusPriority[a.status] ?? 9) - (statusPriority[b.status] ?? 9);
+      if (priorityDiff !== 0) return priorityDiff;
+      // เรียงรหัสวัสดุจากน้อยไปมาก
+      return a.code.localeCompare(b.code, 'th');
+    });
 
   const totalItems = materials.length;
   const inStock = materials.filter((m) => m.status === 'มีสต็อก').length;
@@ -100,12 +110,12 @@ export default function InventoryPage() {
   };
 
   return (
-    <AppLayout title="ระบบสต็อกและคลังสินค้า">
+    <AppLayout title="คลังวัสดุและครุภัณฑ์">
       <div className="page-header">
         <div className="page-header-row">
           <div>
-            <h1>ระบบสต็อกและคลังสินค้า</h1>
-            <p>ติดตามระดับคงคลังแบบ Real-time, ตรวจจับสินค้าใกล้หมด, และเติมสต็อกเข้าสู่ระบบ</p>
+            <h1>คลังวัสดุและครุภัณฑ์</h1>
+            <p>ติดตามระดับคงคลังแบบ Real-time, ตรวจจับวัสดุใกล้หมด, และเติมสต็อกเข้าสู่ระบบ</p>
           </div>
         </div>
       </div>
@@ -191,7 +201,6 @@ export default function InventoryPage() {
                 <th>คงเหลือ</th>
                 <th>ระดับสต็อก</th>
                 <th>สถานที่จัดเก็บ</th>
-                <th>มูลค่ารวม</th>
                 <th>สถานะ</th>
                 <th>การจัดการสต็อก</th>
               </tr>
@@ -232,7 +241,6 @@ export default function InventoryPage() {
                         {m.location}
                       </div>
                     </td>
-                    <td style={{ fontWeight: 700 }}>฿{m.totalValue.toLocaleString('th-TH')}</td>
                     <td>
                       <span className={`badge ${getStatusBadge(m.status)}`}>{m.status}</span>
                     </td>

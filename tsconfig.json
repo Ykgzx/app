@@ -32,3 +32,5 @@
   ],
   "exclude": ["node_modules"]
 }
+
+// Force TS Server reload

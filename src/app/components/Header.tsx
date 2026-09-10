@@ -6,24 +6,37 @@ import { useAppStore } from '../data/store';
 import Modal from './Modal';
 import { useToast } from './AppLayout';
 import Link from 'next/link';
-
+import { api } from '@/lib/api-client';
+import { useEffect } from 'react';
 interface HeaderProps {
   title?: string;
 }
 
 export default function Header({ title = 'ระบบจัดการวัสดุเทศบาล' }: HeaderProps) {
-  const { currentUser, changePassword, requests } = useAppStore();
+  const { currentUser } = useAppStore();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const { showToast, ToastComponent } = useToast();
 
-  const pendingRequestsCount = requests.filter((r) => r.status === 'รออนุมัติ').length;
+  useEffect(() => {
+    if (currentUser.role === 'ผู้อนุมัติ' || currentUser.role === 'ผู้ดูแลระบบ') {
+      api.requests.getAll().then((res) => {
+        if (res.success && res.data) {
+          const pending = res.data.filter((r) => r.status === 'รออนุมัติ');
+          setPendingRequestsCount(pending.length);
+          setPendingRequests(pending.slice(0, 4));
+        }
+      });
+    }
+  }, [currentUser]);
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
       showToast('กรุณากรอกข้อมูลให้ครบทุกช่อง', 'error');
       return;
@@ -37,12 +50,21 @@ export default function Header({ title = 'ระบบจัดการวั�
       return;
     }
 
-    changePassword(oldPassword, newPassword);
-    showToast('เปลี่ยนรหัสผ่านสำเร็จเรียบร้อยแล้ว', 'success');
-    setOldPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setIsPassModalOpen(false);
+    const res = await api.auth.changePassword({
+      userId: currentUser.id,
+      oldPassword,
+      newPassword
+    });
+
+    if (res.success) {
+      showToast('เปลี่ยนรหัสผ่านสำเร็จเรียบร้อยแล้ว', 'success');
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setIsPassModalOpen(false);
+    } else {
+      showToast(res.error || 'รหัสผ่านเดิมไม่ถูกต้อง', 'error');
+    }
   };
 
   const getRoleBadge = (role: string) => {
@@ -102,7 +124,7 @@ export default function Header({ title = 'ระบบจัดการวั�
                   <strong style={{ fontSize: '14px' }}>การแจ้งเตือนคำขอเบิก–ยืม</strong>
                   <span className="badge badge-warning">{pendingRequestsCount} รายการ</span>
                 </div>
-                {requests.slice(0, 4).map((r) => (
+                {pendingRequests.map((r: any) => (
                   <div key={r.id} style={{ padding: '8px 0', borderBottom: '1px solid #f3f4f6', fontSize: '13px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontWeight: 600, color: '#1e40af' }}>{r.requestCode}</span>

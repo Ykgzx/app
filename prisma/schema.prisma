@@ -1,4 +1,5 @@
 // Prisma Schema สำหรับระบบจัดการวัสดุเทศบาล (Municipal Equipment Management System)
+// ปรับให้ตรงกับโครงสร้างฐานข้อมูลจริง
 
 generator client {
   provider = "prisma-client-js"
@@ -9,28 +10,86 @@ datasource db {
 }
 
 // -------------------------------------------------------------
+// Enums
+// -------------------------------------------------------------
+enum request_type {
+  BORROW
+  WITHDRAW
+}
+
+enum request_status {
+  PENDING
+  APPROVED
+  REJECTED
+  BORROWING
+  RETURNED
+  CANCELLED
+}
+
+enum approval_result {
+  APPROVED
+  REJECTED
+}
+
+enum stock_movement_type {
+  IN
+  OUT
+  RETURN
+}
+
+// -------------------------------------------------------------
+// บทบาท (Role)
+// -------------------------------------------------------------
+model Role {
+  id          Int      @id @default(autoincrement())
+  role_name   String   @db.VarChar(50)
+  description String?  @db.Text
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+
+  users User[]
+
+  @@map("roles")
+}
+
+// -------------------------------------------------------------
+// แผนก/กอง (Department)
+// -------------------------------------------------------------
+model Department {
+  id              Int      @id @default(autoincrement())
+  department_name String   @db.VarChar(150)
+  description     String?  @db.Text
+  created_at      DateTime @default(now()) @db.Timestamp(6)
+  updated_at      DateTime @updatedAt @db.Timestamp(6)
+
+  users User[]
+
+  @@map("departments")
+}
+
+// -------------------------------------------------------------
 // ผู้ใช้งานระบบ (User)
 // -------------------------------------------------------------
 model User {
-  id          String   @id @default(uuid())
-  fullName    String
-  username    String   @unique
-  password    String?  // Hash ด้วย bcryptjs เมื่อต่อ DB จริง
-  email       String   @unique
-  department  String
-  role        String   @default("เจ้าหน้าที่") // ผู้ดูแลระบบ, ผู้อนุมัติ, เจ้าหน้าที่
-  status      String   @default("ใช้งาน") // ใช้งาน, ไม่ใช้งาน
-  lastLogin   String   @default("-")
-  avatar      String?
-  phone       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  username      String   @unique @db.VarChar(100)
+  password_hash String?  @db.Text
+  first_name    String   @db.VarChar(100)
+  last_name     String   @db.VarChar(100)
+  email         String   @unique @db.VarChar(255)
+  phone         String?  @db.VarChar(20)
+  role_id       Int
+  department_id Int
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamp(6)
+  updated_at    DateTime @updatedAt @db.Timestamp(6)
 
-  // ความสัมพันธ์
-  requests        Request[]        @relation("UserRequests")
-  approvedRequests Request[]       @relation("ApprovedRequests")
-  returnRecords   ReturnRecord[]   @relation("ReceivedReturns")
-  activityLogs    ActivityLog[]
+  role       Role       @relation(fields: [role_id], references: [id])
+  department Department @relation(fields: [department_id], references: [id])
+
+  requests             Request[]
+  returns              Return[]
+  stock_replenishments StockReplenishment[]
+  audit_logs           AuditLog[]
 
   @@map("users")
 }
@@ -39,15 +98,13 @@ model User {
 // หมวดหมู่วัสดุ (Category)
 // -------------------------------------------------------------
 model Category {
-  id          String     @id @default(uuid())
-  name        String     @unique
-  description String?
-  icon        String     @default("📦")
-  status      String     @default("ใช้งาน") // ใช้งาน, ไม่ใช้งาน
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id            Int      @id @default(autoincrement())
+  category_name String   @db.VarChar(150)
+  description   String?  @db.Text
+  created_at    DateTime @default(now()) @db.Timestamp(6)
+  updated_at    DateTime @updatedAt @db.Timestamp(6)
 
-  materials   Material[]
+  materials Material[]
 
   @@map("categories")
 }
@@ -56,96 +113,172 @@ model Category {
 // วัสดุและครุภัณฑ์ (Material)
 // -------------------------------------------------------------
 model Material {
-  id           String    @id @default(uuid())
-  code         String    @unique
-  name         String
-  categoryId   String
-  category     Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  unit         String
-  quantity     Int       @default(0)
-  minQuantity  Int       @default(10)
-  pricePerUnit Float     @default(0.0)
-  location     String?
-  description  String?
-  status       String    @default("มีสต็อก") // มีสต็อก, ใกล้หมด, หมดสต็อก
-  lastUpdated  DateTime  @default(now())
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id             Int      @id @default(autoincrement())
+  material_code  String   @unique @db.VarChar(50)
+  material_name  String   @db.VarChar(255)
+  category_id    Int
+  item_type      String?  @db.VarChar(50)
+  description    String?  @db.Text
+  unit           String?  @db.VarChar(50)
+  stock_quantity Int      @default(0)
+  minimum_stock  Int      @default(0)
+  image_url      String?  @db.Text
+  location       String?  @db.VarChar(255)
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now()) @db.Timestamp(6)
+  updated_at     DateTime @updatedAt @db.Timestamp(6)
 
-  requests     Request[]
+  category Category @relation(fields: [category_id], references: [id])
+
+  request_items        RequestItem[]
+  return_items         ReturnItem[]
+  stock_movements      StockMovement[]
+  stock_replenishments StockReplenishment[]
 
   @@map("materials")
 }
 
 // -------------------------------------------------------------
-// คำขอเบิก - ยืมวัสดุ (Request)
+// คำขอ (Request)
 // -------------------------------------------------------------
 model Request {
-  id                 String         @id @default(uuid())
-  requestCode        String         @unique
-  requestType        String         // เบิกวัสดุ, ยืมวัสดุ
-  requesterId        String
-  requester          User           @relation("UserRequests", fields: [requesterId], references: [id])
-  materialId         String
-  material           Material       @relation(fields: [materialId], references: [id])
-  quantity           Int
-  unit               String
-  reason             String
-  status             String         @default("รออนุมัติ") // รออนุมัติ, อนุมัติแล้ว, ไม่อนุมัติ, กำลังยืม, คืนแล้ว, ยกเลิกแล้ว
-  requestDate        DateTime       @default(now())
-  borrowDate         DateTime?
-  expectedReturnDate DateTime?
-  actualReturnDate   DateTime?
-  returnedQuantity   Int?
-  returnCondition    String?        // สมบูรณ์, ชำรุด, สูญหาย
-  returnNotes        String?
-  approvedById       String?
-  approver           User?          @relation("ApprovedRequests", fields: [approvedById], references: [id])
-  approvedDate       DateTime?
-  rejectReason       String?
-  cancelledById      String?
-  cancelledDate      DateTime?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  id           Int            @id @default(autoincrement())
+  request_code String         @unique @db.VarChar(50)
+  user_id      Int
+  request_type request_type
+  status       request_status
+  reason       String?        @db.Text
+  borrow_date  DateTime?      @db.Date
+  due_date     DateTime?      @db.Date
+  created_at   DateTime       @default(now()) @db.Timestamp(6)
+  updated_at   DateTime       @updatedAt @db.Timestamp(6)
 
-  returnRecords      ReturnRecord[]
+  user          User          @relation(fields: [user_id], references: [id])
+  request_items RequestItem[]
+  returns       Return[]
 
   @@map("requests")
 }
 
 // -------------------------------------------------------------
-// บันทึกการส่งคืนวัสดุ (ReturnRecord)
+// รายการวัสดุในคำขอ (Request Item)
 // -------------------------------------------------------------
-model ReturnRecord {
-  id               String   @id @default(uuid())
-  requestId        String
-  request          Request  @relation(fields: [requestId], references: [id])
-  borrowedQuantity Int
-  returnedQuantity Int
-  returnDate       DateTime @default(now())
-  condition        String   @default("สมบูรณ์") // สมบูรณ์, ชำรุด, สูญหาย
-  receivedById     String
-  receiver         User     @relation("ReceivedReturns", fields: [receivedById], references: [id])
-  notes            String?
-  createdAt        DateTime @default(now())
+model RequestItem {
+  id          Int      @id @default(autoincrement())
+  request_id  Int
+  material_id Int
+  quantity    Int
+  created_at  DateTime @default(now()) @db.Timestamp(6)
 
-  @@map("return_records")
+  request  Request  @relation(fields: [request_id], references: [id])
+  material Material @relation(fields: [material_id], references: [id])
+
+  @@map("request_items")
 }
 
 // -------------------------------------------------------------
-// บันทึกประวัติการใช้งาน (ActivityLog / Audit Trail)
+// การอนุมัติ (Approval)
 // -------------------------------------------------------------
-model ActivityLog {
-  id          String   @id @default(uuid())
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  userName    String
-  action      String
-  description String
-  module      String
-  type        String   // สร้าง, แก้ไข, ลบ, เข้าสู่ระบบ, อนุมัติ, เบิกจ่าย
-  ipAddress   String?  @default("127.0.0.1")
-  timestamp   DateTime @default(now())
+model Approval {
+  id          Int             @id @default(autoincrement())
+  request_id  Int
+  approver_id Int
+  result      approval_result
+  reason      String?         @db.Text
+  approved_at DateTime        @default(now()) @db.Timestamp(6)
 
-  @@map("activity_logs")
+  @@map("approvals")
+}
+
+// -------------------------------------------------------------
+// การคืนวัสดุ (Return)
+// -------------------------------------------------------------
+model Return {
+  id          Int       @id @default(autoincrement())
+  return_code String    @unique @db.VarChar(50)
+  request_id  Int
+  user_id     Int
+  return_date DateTime? @db.Date
+  note        String?   @db.Text
+  created_at  DateTime  @default(now()) @db.Timestamp(6)
+
+  request Request @relation(fields: [request_id], references: [id])
+  user    User    @relation(fields: [user_id], references: [id])
+
+  return_items ReturnItem[]
+
+  @@map("returns")
+}
+
+// -------------------------------------------------------------
+// รายการวัสดุที่คืน (Return Item)
+// -------------------------------------------------------------
+model ReturnItem {
+  id          Int      @id @default(autoincrement())
+  return_id   Int
+  material_id Int
+  quantity    Int
+  condition   String?  @db.VarChar(100)
+  note        String?  @db.Text
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+
+  return_   Return   @relation(fields: [return_id], references: [id])
+  material  Material @relation(fields: [material_id], references: [id])
+
+  @@map("return_items")
+}
+
+// -------------------------------------------------------------
+// ความเคลื่อนไหวสต็อก (Stock Movement)
+// -------------------------------------------------------------
+model StockMovement {
+  id            Int                 @id @default(autoincrement())
+  material_id   Int
+  movement_type stock_movement_type
+  quantity      Int
+  reference_id  Int?
+  note          String?             @db.Text
+  created_by    Int?
+  created_at    DateTime            @default(now()) @db.Timestamp(6)
+
+  material Material @relation(fields: [material_id], references: [id])
+
+  @@map("stock_movements")
+}
+
+// -------------------------------------------------------------
+// การเติมสต็อก (Stock Replenishment)
+// -------------------------------------------------------------
+model StockReplenishment {
+  id           Int      @id @default(autoincrement())
+  material_id  Int
+  quantity     Int
+  supplier     String?  @db.VarChar(255)
+  reference_no String?  @db.VarChar(100)
+  note         String?  @db.Text
+  added_by     Int?
+  created_at   DateTime @default(now()) @db.Timestamp(6)
+
+  material Material @relation(fields: [material_id], references: [id])
+  user     User?    @relation(fields: [added_by], references: [id])
+
+  @@map("stock_replenishments")
+}
+
+// -------------------------------------------------------------
+// บันทึกประวัติการทำงาน (Audit Log)
+// -------------------------------------------------------------
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  user_id     Int?
+  action      String   @db.VarChar(100)
+  table_name  String   @db.VarChar(100)
+  record_id   Int?
+  description String?  @db.Text
+  ip_address  String?  @db.VarChar(45)
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@map("audit_logs")
 }

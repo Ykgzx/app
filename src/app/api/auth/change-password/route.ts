@@ -27,8 +27,8 @@ export async function POST(req: NextRequest) {
     // Hash and save new password
     const hashedPassword = await hashPassword(newPassword);
     await prisma.user.update({
-      where: { id: userId },
-      data: { password: hashedPassword },
+      where: { id: Number(userId) },
+      data: { password_hash: hashedPassword },
     });
 
     await prismaRepository.createActivityLog({

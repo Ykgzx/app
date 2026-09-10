@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import AppLayout from './components/AppLayout';
 import StatsCard from './components/StatsCard';
 import { useAppStore } from './data/store';
@@ -17,19 +18,57 @@ import {
   ShieldCheck,
   ArrowRight,
 } from 'lucide-react';
-import { monthlyReportData, departmentUsageData } from './data/mockData';
+
+// ข้อมูลสำหรับแผนภูมิ (จะถูกแทนที่ด้วยข้อมูลจริงจาก API ในอนาคต)
+const monthlyReportData = [
+  { month: 'ม.ค.', withdrawals: 120, value: 185000, requests: 45 },
+  { month: 'ก.พ.', withdrawals: 98, value: 142000, requests: 38 },
+  { month: 'มี.ค.', withdrawals: 135, value: 210000, requests: 52 },
+  { month: 'เม.ย.', withdrawals: 89, value: 125000, requests: 33 },
+  { month: 'พ.ค.', withdrawals: 112, value: 178000, requests: 41 },
+  { month: 'มิ.ย.', withdrawals: 145, value: 235000, requests: 55 },
+  { month: 'ก.ค.', withdrawals: 130, value: 198000, requests: 48 },
+  { month: 'ส.ค.', withdrawals: 156, value: 245000, requests: 62 },
+];
+
+const departmentUsageData = [
+  { department: 'กองช่าง', percentage: 35, value: 857500, color: '#3b82f6' },
+  { department: 'สำนักปลัด', percentage: 22, value: 539000, color: '#10b981' },
+  { department: 'กองคลัง', percentage: 15, value: 367500, color: '#f59e0b' },
+  { department: 'กองสาธารณสุข', percentage: 18, value: 441000, color: '#ef4444' },
+  { department: 'กองการศึกษา', percentage: 10, value: 245000, color: '#8b5cf6' },
+];
 
 export default function DashboardPage() {
-  const { users, categories, materials, requests, activityLogs, currentUser } = useAppStore();
+  const { currentUser } = useAppStore();
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    totalMaterials: 0,
+    totalCategories: 0,
+    pendingApprovals: 0,
+    lowStockItems: 0,
+    outOfStockItems: 0,
+    activeBorrows: 0,
+    recentLogs: [] as { id: string; action: string; description: string; type: string; timestamp: string; module: string }[],
+  });
 
-  const totalUsers = users.length;
-  const activeUsers = users.filter((u) => u.status === 'ใช้งาน').length;
-  const totalMaterials = materials.length;
-  const totalCategories = categories.length;
-  const pendingApprovals = requests.filter((r) => r.status === 'รออนุมัติ').length;
-  const lowStockItems = materials.filter((m) => m.status === 'ใกล้หมด').length;
-  const outOfStockItems = materials.filter((m) => m.status === 'หมดสต็อก').length;
-  const borrowingItems = requests.filter((r) => r.status === 'กำลังยืม').length;
+  useState(() => {
+    fetch('/api/dashboard/stats')
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && res.data) setStats(res.data);
+      })
+      .catch(() => {});
+  });
+
+  const totalUsers = stats.totalUsers;
+  const activeUsers = stats.activeUsers;
+  const totalMaterials = stats.totalMaterials;
+  const totalCategories = stats.totalCategories;
+  const pendingApprovals = stats.pendingApprovals;
+  const lowStockItems = stats.lowStockItems;
+  const borrowingItems = stats.activeBorrows;
 
   const maxWithdrawals = Math.max(...monthlyReportData.map((d) => d.withdrawals));
 
@@ -309,7 +348,7 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="activity-list">
-            {activityLogs.slice(0, 5).map((log) => {
+            {stats.recentLogs.slice(0, 5).map((log) => {
               const iconClass =
                 log.type === 'สร้าง' ? 'create' :
                   log.type === 'แก้ไข' ? 'edit' :

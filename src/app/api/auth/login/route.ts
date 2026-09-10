@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, LoginResponseDto } from '@/lib/types/api';
 import { generateToken, verifyPassword, getDefaultPasswordHash } from '@/lib/auth';
 
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = serverRepository.getUserByUsernameOrEmail(identifier);
+    const user = await prismaRepository.getUserWithPassword(identifier);
 
     if (!user) {
       return NextResponse.json<ApiResponse>(
@@ -40,10 +40,10 @@ export async function POST(req: NextRequest) {
     }
 
     // ตรวจสอบรหัสผ่าน
-    // ในระบบ Demo: รหัสผ่านเริ่มต้นคือ "password123" สำหรับทุกบัญชี
-    // ในระบบจริง: ควรเก็บ password_hash ในฐานข้อมูล
-    const defaultHash = await getDefaultPasswordHash();
-    const isPasswordValid = await verifyPassword(password, defaultHash);
+    // ถ้าผู้ใช้มี password hash ในฐานข้อมูล ให้ใช้ hash นั้น
+    // ถ้าไม่มี ใช้ default password hash (password123)
+    const passwordHash = user.password || await getDefaultPasswordHash();
+    const isPasswordValid = await verifyPassword(password, passwordHash);
 
     if (!isPasswordValid) {
       return NextResponse.json<ApiResponse>(
@@ -60,8 +60,11 @@ export async function POST(req: NextRequest) {
       role: user.role,
     });
 
+    // Update last login
+    await prismaRepository.updateLastLogin(user.id);
+
     // Log Activity
-    serverRepository.createActivityLog({
+    await prismaRepository.createActivityLog({
       userName: user.fullName,
       action: 'เข้าสู่ระบบ',
       description: `${user.fullName} (${user.role}) เข้าสู่ระบบสำเร็จ`,
@@ -77,10 +80,10 @@ export async function POST(req: NextRequest) {
         username: user.username,
         email: user.email,
         department: user.department,
-        role: user.role,
-        status: user.status,
-        avatar: user.avatar,
-        phone: user.phone,
+        role: user.role as LoginResponseDto['user']['role'],
+        status: user.status as LoginResponseDto['user']['status'],
+        avatar: user.avatar || user.fullName.slice(0, 2),
+        phone: user.phone || undefined,
       },
     };
 

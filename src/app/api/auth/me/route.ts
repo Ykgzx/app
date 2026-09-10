@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse } from '@/lib/types/api';
-import { User } from '@/app/data/mockData';
+import { User } from '@/app/data/types';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId') || '1'; // Default to admin for testing
 
-    const user = serverRepository.getUserById(userId);
+    const user = await prismaRepository.getUserById(userId);
     if (!user) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: 'ไม่พบข้อมูลผู้ใช้' },

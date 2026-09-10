@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, CreateMaterialDto } from '@/lib/types/api';
-import { Material } from '@/app/data/mockData';
+import { Material } from '@/app/data/types';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     const categoryId = searchParams.get('categoryId') || undefined;
     const status = searchParams.get('status') || undefined;
 
-    const materials = serverRepository.getMaterials({ search, categoryId, status });
+    const materials = await prismaRepository.getMaterials({ search, categoryId, status });
 
     return NextResponse.json<ApiResponse<Material[]>>({
       success: true,
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newMaterial = serverRepository.createMaterial(body);
+    const newMaterial = await prismaRepository.createMaterial(body);
 
     return NextResponse.json<ApiResponse<Material>>(
       {

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, CreateRequestDto, RequestType } from '@/lib/types/api';
-import { EnhancedRequest } from '@/app/data/store';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,9 +9,9 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status') || undefined;
     const type = (searchParams.get('type') as RequestType) || undefined;
 
-    const requests = serverRepository.getRequests({ requesterId, status, type });
+    const requests = await prismaRepository.getRequests({ requesterId, status, type });
 
-    return NextResponse.json<ApiResponse<EnhancedRequest[]>>({
+    return NextResponse.json<ApiResponse<typeof requests>>({
       success: true,
       data: requests,
       total: requests.length,
@@ -44,9 +43,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newRequest = serverRepository.createRequest(body);
+    const newRequest = await prismaRepository.createRequest(body);
 
-    return NextResponse.json<ApiResponse<EnhancedRequest>>(
+    return NextResponse.json<ApiResponse<typeof newRequest>>(
       {
         success: true,
         message: 'ส่งคำขอสำเร็จ',

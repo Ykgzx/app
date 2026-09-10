@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse } from '@/lib/types/api';
 
 export async function GET() {
   try {
-    const stats = serverRepository.getDashboardStats();
+    const stats = await prismaRepository.getDashboardStats();
     return NextResponse.json<ApiResponse<typeof stats>>({
       success: true,
       data: stats,

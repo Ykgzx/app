@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, ApproveRequestDto } from '@/lib/types/api';
-import { EnhancedRequest } from '@/app/data/store';
 
 export async function POST(
   req: NextRequest,
@@ -16,7 +15,7 @@ export async function POST(
       // Body is optional
     }
 
-    const approved = serverRepository.approveRequest(id, body.approverName);
+    const approved = await prismaRepository.approveRequest(id, body.approverName, body.approverId);
 
     if (!approved) {
       return NextResponse.json<ApiResponse>(
@@ -25,7 +24,7 @@ export async function POST(
       );
     }
 
-    return NextResponse.json<ApiResponse<EnhancedRequest>>({
+    return NextResponse.json<ApiResponse<typeof approved>>({
       success: true,
       message: `อนุมัติคำขอ ${approved.requestCode} เรียบร้อยแล้ว (ตัดสต็อกอัตโนมัติ)`,
       data: approved,

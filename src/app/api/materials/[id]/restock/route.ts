@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, RestockMaterialDto } from '@/lib/types/api';
-import { Material } from '@/app/data/mockData';
+import { Material } from '@/app/data/types';
 
 export async function POST(
   req: NextRequest,
@@ -19,7 +19,7 @@ export async function POST(
       );
     }
 
-    const restocked = serverRepository.restockMaterial(
+    const restocked = await prismaRepository.restockMaterial(
       id,
       addQty,
       body.reason || 'เติมสต็อกตามรอบสั่งซื้อ',

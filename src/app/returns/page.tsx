@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from '../components/AppLayout';
 import StatsCard from '../components/StatsCard';
 import Modal from '../components/Modal';
 import { useToast } from '../components/AppLayout';
-import { useAppStore, EnhancedRequest } from '../data/store';
+import { EnhancedRequest, ReturnRecord } from '../data/store';
 import {
   RotateCcw,
   CheckCircle,
@@ -17,9 +17,14 @@ import {
   FileCheck,
   History,
 } from 'lucide-react';
+import { api } from '@/lib/api-client';
+import { useAppStore } from '../data/store';
 
 export default function ReturnsPage() {
-  const { requests, returnRecords, processReturn, currentUser } = useAppStore();
+  const { currentUser } = useAppStore();
+  const [requests, setRequests] = useState<EnhancedRequest[]>([]);
+  const [returnRecords, setReturnRecords] = useState<ReturnRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<EnhancedRequest | null>(null);
   const [returnQty, setReturnQty] = useState(1);
@@ -29,6 +34,21 @@ export default function ReturnsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'borrowed' | 'history'>('borrowed');
   const { showToast, ToastComponent } = useToast();
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    const [reqRes, retRes] = await Promise.all([
+      api.requests.getAll(),
+      api.returns.getAll()
+    ]);
+    if (reqRes.success && reqRes.data) setRequests(reqRes.data);
+    if (retRes.success && retRes.data) setReturnRecords(retRes.data);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   // Active borrowed items needing return
   const borrowedItems = requests.filter(
@@ -58,7 +78,7 @@ export default function ReturnsPage() {
     setIsReturnModalOpen(true);
   };
 
-  const handleConfirmReturn = () => {
+  const handleConfirmReturn = async () => {
     if (!selectedRequest) return;
     if (returnQty <= 0) {
       showToast('จำนวนที่คืนต้องมากกว่า 0', 'error');
@@ -69,15 +89,21 @@ export default function ReturnsPage() {
       return;
     }
 
-    processReturn({
+    const res = await api.returns.process({
       requestId: selectedRequest.id,
       returnedQuantity: returnQty,
       returnDate: returnDate || '16 ส.ค. 2569',
       condition,
       notes,
+      receivedById: currentUser.id
     });
 
-    showToast(`บันทึกการคืนวัสดุ ${selectedRequest.materialName} และปรับปรุงสต็อกสำเร็จ!`, 'success');
+    if (res.success) {
+      showToast(`บันทึกการคืนวัสดุ ${selectedRequest.materialName} และปรับปรุงสต็อกสำเร็จ!`, 'success');
+      fetchData();
+    } else {
+      showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+    }
     setIsReturnModalOpen(false);
   };
 

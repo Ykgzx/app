@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout, { useToast } from '../components/AppLayout';
 import StatsCard from '../components/StatsCard';
 import { useAppStore } from '../data/store';
@@ -19,17 +19,59 @@ import {
   Layers,
   Search,
 } from 'lucide-react';
-import { monthlyReportData, departmentUsageData } from '../data/mockData';
+import { api } from '@/lib/api-client';
+import { Material, ActivityLog } from '../data/types';
+import { EnhancedRequest, ReturnRecord } from '../data/store';
+
+// ข้อมูลสำหรับแผนภูมิ (จะถูกแทนที่ด้วยข้อมูลจริงจาก API ในอนาคต)
+const monthlyReportData = [
+  { month: 'ม.ค.', withdrawals: 120, value: 185000, requests: 45 },
+  { month: 'ก.พ.', withdrawals: 98, value: 142000, requests: 38 },
+  { month: 'มี.ค.', withdrawals: 135, value: 210000, requests: 52 },
+  { month: 'เม.ย.', withdrawals: 89, value: 125000, requests: 33 },
+  { month: 'พ.ค.', withdrawals: 112, value: 178000, requests: 41 },
+  { month: 'มิ.ย.', withdrawals: 145, value: 235000, requests: 55 },
+  { month: 'ก.ค.', withdrawals: 130, value: 198000, requests: 48 },
+  { month: 'ส.ค.', withdrawals: 156, value: 245000, requests: 62 },
+];
+
+const departmentUsageData = [
+  { department: 'กองช่าง', percentage: 35, value: 857500, color: '#3b82f6' },
+  { department: 'สำนักปลัด', percentage: 22, value: 539000, color: '#10b981' },
+  { department: 'กองคลัง', percentage: 15, value: 367500, color: '#f59e0b' },
+  { department: 'กองสาธารณสุข', percentage: 18, value: 441000, color: '#ef4444' },
+  { department: 'กองการศึกษา', percentage: 10, value: 245000, color: '#8b5cf6' },
+];
 
 import AccessDenied from '../components/AccessDenied';
 
 type ReportTab = 'requisition' | 'borrow' | 'return' | 'stock' | 'lowstock' | 'activity';
 
 export default function ReportsPage() {
-  const { materials, requests, returnRecords, activityLogs, currentUser } = useAppStore();
+  const { currentUser } = useAppStore();
   const [activeTab, setActiveTab] = useState<ReportTab>('requisition');
   const [searchQuery, setSearchQuery] = useState('');
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [requests, setRequests] = useState<EnhancedRequest[]>([]);
+  const [returnRecords, setReturnRecords] = useState<ReturnRecord[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const { showToast, ToastComponent } = useToast();
+
+  useEffect(() => {
+    if (currentUser.role !== 'เจ้าหน้าที่') {
+      Promise.all([
+        api.materials.getAll(),
+        api.requests.getAll(),
+        api.returns.getAll(),
+        api.logs.getAll()
+      ]).then(([matRes, reqRes, retRes, logRes]) => {
+        if (matRes.success && matRes.data) setMaterials(matRes.data);
+        if (reqRes.success && reqRes.data) setRequests(reqRes.data);
+        if (retRes.success && retRes.data) setReturnRecords(retRes.data);
+        if (logRes.success && logRes.data) setActivityLogs(logRes.data);
+      });
+    }
+  }, [currentUser]);
 
   if (currentUser.role === 'เจ้าหน้าที่') {
     return (
@@ -40,19 +82,19 @@ export default function ReportsPage() {
   }
 
   // 1. Requisitions
-  const requisitions = requests.filter((r) => r.requestType === 'เบิกวัสดุ');
+  const requisitions = requests.filter((r: EnhancedRequest) => r.requestType === 'เบิกวัสดุ');
   // 2. Borrows
-  const borrows = requests.filter((r) => r.requestType === 'ยืมวัสดุ');
+  const borrows = requests.filter((r: EnhancedRequest) => r.requestType === 'ยืมวัสดุ');
   // 3. Returns
   const returns = returnRecords;
   // 4. Stock balance
   const stockItems = materials;
   // 5. Low stock items
-  const lowStockItems = materials.filter((m) => m.status === 'ใกล้หมด' || m.status === 'หมดสต็อก');
+  const lowStockItems = materials.filter((m: Material) => m.status === 'ใกล้หมด' || m.status === 'หมดสต็อก');
   // 6. Activity logs
   const logs = activityLogs;
 
-  const totalValue = materials.reduce((sum, m) => sum + m.totalValue, 0);
+  const totalValue = materials.reduce((sum: number, m: any) => sum + (m.quantity * (m.pricePerUnit || 0)), 0);
 
   const handleExportCSV = () => {
     showToast('ระบบทำการส่งออกรายงาน Excel/CSV เรียบร้อยแล้ว', 'success');
@@ -196,7 +238,7 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {requisitions.map((r) => (
+                {requisitions.map((r: EnhancedRequest) => (
                   <tr key={r.id}>
                     <td style={{ fontWeight: 700, color: 'var(--primary-600)' }}>{r.requestCode}</td>
                     <td style={{ fontWeight: 600 }}>{r.requesterName}</td>
@@ -231,7 +273,7 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {borrows.map((r) => (
+                {borrows.map((r: EnhancedRequest) => (
                   <tr key={r.id}>
                     <td style={{ fontWeight: 700, color: '#0891b2' }}>{r.requestCode}</td>
                     <td style={{ fontWeight: 600 }}>{r.requesterName}</td>
@@ -267,7 +309,7 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {returns.map((rec) => (
+                {returns.map((rec: ReturnRecord) => (
                   <tr key={rec.id}>
                     <td style={{ fontWeight: 700, color: '#059669' }}>{rec.id}</td>
                     <td style={{ fontWeight: 600, color: 'var(--primary-600)' }}>{rec.requestCode}</td>
@@ -306,7 +348,7 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {stockItems.map((m) => (
+                {stockItems.map((m: Material) => (
                   <tr key={m.id}>
                     <td style={{ fontWeight: 700, color: 'var(--primary-600)' }}>{m.code}</td>
                     <td style={{ fontWeight: 600 }}>{m.name}</td>
@@ -340,7 +382,7 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {lowStockItems.map((m) => {
+                {lowStockItems.map((m: Material) => {
                   const shortage = Math.max(0, m.minQuantity - m.quantity);
                   return (
                     <tr key={m.id}>
@@ -375,7 +417,7 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => (
+                {logs.map((log: ActivityLog) => (
                   <tr key={log.id}>
                     <td style={{ fontSize: '12px', whiteSpace: 'nowrap' }}>{log.timestamp}</td>
                     <td style={{ fontWeight: 600 }}>{log.action}</td>

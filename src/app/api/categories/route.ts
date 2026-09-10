@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, CreateCategoryDto } from '@/lib/types/api';
-import { Category } from '@/app/data/mockData';
+import { Category } from '@/app/data/types';
 
 export async function GET() {
   try {
-    const categories = serverRepository.getCategories();
+    const categories = await prismaRepository.getCategories();
     return NextResponse.json<ApiResponse<Category[]>>({
       success: true,
       data: categories,
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newCategory = serverRepository.createCategory(body);
+    const newCategory = await prismaRepository.createCategory(body);
 
     return NextResponse.json<ApiResponse<Category>>(
       {

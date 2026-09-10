@@ -19,7 +19,7 @@ import {
   CreateActivityLogDto,
   RequestType,
 } from './types/api';
-import { User, Category, Material, ActivityLog } from '@/app/data/mockData';
+import { User, Category, Material, ActivityLog } from '@/app/data/types';
 import { EnhancedRequest, ReturnRecord } from '@/app/data/store';
 
 async function fetcher<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {

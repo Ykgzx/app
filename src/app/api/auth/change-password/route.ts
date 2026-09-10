@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, ChangePasswordDto } from '@/lib/types/api';
+import { hashPassword } from '@/lib/auth';
+import prisma from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,7 +16,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = serverRepository.getUserById(userId);
+    const user = await prismaRepository.getUserById(userId);
     if (!user) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: 'ไม่พบผู้ใช้ในระบบ' },
@@ -22,7 +24,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    serverRepository.createActivityLog({
+    // Hash and save new password
+    const hashedPassword = await hashPassword(newPassword);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    await prismaRepository.createActivityLog({
       userName: user.fullName,
       action: 'เปลี่ยนรหัสผ่าน',
       description: `ผู้ใช้ ${user.fullName} ได้เปลี่ยนรหัสผ่านสำเร็จ`,

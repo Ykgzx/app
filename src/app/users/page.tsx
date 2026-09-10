@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from '../components/AppLayout';
 import StatsCard from '../components/StatsCard';
 import Modal from '../components/Modal';
@@ -19,7 +19,8 @@ import {
   ChevronRight,
   ShieldCheck,
 } from 'lucide-react';
-import { departments, type User } from '../data/mockData';
+import { departments, type User } from '../data/types';
+import { api } from '@/lib/api-client';
 
 import AccessDenied from '../components/AccessDenied';
 
@@ -34,7 +35,9 @@ const emptyUser: Omit<User, 'id' | 'avatar' | 'createdAt' | 'lastLogin'> = {
 };
 
 export default function UsersPage() {
-  const { users, addUser, updateUser, deleteUser, currentUser } = useAppStore();
+  const { currentUser } = useAppStore();
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,6 +47,21 @@ export default function UsersPage() {
   const [formData, setFormData] = useState(emptyUser);
   const [currentPage, setCurrentPage] = useState(1);
   const { showToast, ToastComponent } = useToast();
+
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    const res = await api.users.getAll();
+    if (res.success && res.data) {
+      setUsers(res.data);
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    if (currentUser.role === 'ผู้ดูแลระบบ') {
+      fetchUsers();
+    }
+  }, [currentUser]);
 
   if (currentUser.role !== 'ผู้ดูแลระบบ') {
     return (
@@ -100,27 +118,42 @@ export default function UsersPage() {
   };
 
   // Save user
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.fullName || !formData.username || !formData.department) {
       showToast('กรุณากรอกข้อมูลสำคัญให้ครบถ้วน', 'error');
       return;
     }
 
     if (editingUser) {
-      updateUser(editingUser.id, formData);
-      showToast('แก้ไขข้อมูลผู้ใช้สำเร็จ', 'success');
+      const res = await api.users.update(editingUser.id, formData);
+      if (res.success) {
+        showToast('แก้ไขข้อมูลผู้ใช้สำเร็จ', 'success');
+        fetchUsers();
+      } else {
+        showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+      }
     } else {
-      addUser(formData);
-      showToast('เพิ่มผู้ใช้งานใหม่สำเร็จ', 'success');
+      const res = await api.users.create({ ...formData, password: 'password123' });
+      if (res.success) {
+        showToast('เพิ่มผู้ใช้งานใหม่สำเร็จ', 'success');
+        fetchUsers();
+      } else {
+        showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+      }
     }
     setIsModalOpen(false);
   };
 
   // Delete user
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingUser) {
-      deleteUser(deletingUser.id);
-      showToast('ลบผู้ใช้เรียบร้อยแล้ว', 'success');
+      const res = await api.users.delete(deletingUser.id);
+      if (res.success) {
+        showToast('ลบผู้ใช้เรียบร้อยแล้ว', 'success');
+        fetchUsers();
+      } else {
+        showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+      }
       setIsDeleteModalOpen(false);
       setDeletingUser(null);
     }

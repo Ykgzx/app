@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from '../components/AppLayout';
 import StatsCard from '../components/StatsCard';
 import Modal from '../components/Modal';
@@ -25,9 +25,14 @@ import {
   AlertTriangle,
   X,
 } from 'lucide-react';
+import { api } from '@/lib/api-client';
+import { Material } from '../data/types';
 
 export default function RequestsPage() {
-  const { currentUser, materials, requests, createRequest, cancelRequest } = useAppStore();
+  const { currentUser } = useAppStore();
+  const [requests, setRequests] = useState<EnhancedRequest[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
@@ -46,6 +51,21 @@ export default function RequestsPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [viewOnlyMine, setViewOnlyMine] = useState(false);
   const { showToast, ToastComponent } = useToast();
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    const [reqRes, matRes] = await Promise.all([
+      api.requests.getAll(),
+      api.materials.getAll()
+    ]);
+    if (reqRes.success && reqRes.data) setRequests(reqRes.data);
+    if (matRes.success && matRes.data) setMaterials(matRes.data);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const selectedMaterial = materials.find((m) => m.id === selectedMaterialId);
 
@@ -92,15 +112,20 @@ export default function RequestsPage() {
     setIsCancelModalOpen(true);
   };
 
-  const handleConfirmCancel = () => {
+  const handleConfirmCancel = async () => {
     if (!selectedCancelRequest) return;
-    cancelRequest(selectedCancelRequest.id);
-    showToast(`ยกเลิกคำขอ ${selectedCancelRequest.requestCode} สำเร็จเรียบร้อยแล้ว`, 'info');
+    const res = await api.requests.cancel(selectedCancelRequest.id);
+    if (res.success) {
+      showToast(`ยกเลิกคำขอ ${selectedCancelRequest.requestCode} สำเร็จเรียบร้อยแล้ว`, 'info');
+      fetchData();
+    } else {
+      showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+    }
     setIsCancelModalOpen(false);
     setSelectedCancelRequest(null);
   };
 
-  const handleCreateRequest = () => {
+  const handleCreateRequest = async () => {
     if (!selectedMaterialId) {
       showToast('กรุณาเลือกวัสดุอุปกรณ์', 'error');
       return;
@@ -118,16 +143,22 @@ export default function RequestsPage() {
       return;
     }
 
-    createRequest({
+    const res = await api.requests.create({
       requestType,
       materialId: selectedMaterialId,
       quantity,
       reason,
+      requesterId: currentUser.id,
       borrowDate: requestType === 'ยืมวัสดุ' ? borrowDate : undefined,
       expectedReturnDate: requestType === 'ยืมวัสดุ' ? expectedReturnDate : undefined,
     });
 
-    showToast(`ส่งคำขอ${requestType}สำเร็จเรียบร้อยแล้ว`, 'success');
+    if (res.success) {
+      showToast(`ส่งคำขอ${requestType}สำเร็จเรียบร้อยแล้ว`, 'success');
+      fetchData();
+    } else {
+      showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+    }
     setIsModalOpen(false);
   };
 

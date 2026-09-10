@@ -4,11 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldCheck, UserCheck, Users, Lock, Mail, ArrowRight, Sparkles } from 'lucide-react';
 import { useAppStore } from '../data/store';
-import { mockUsers, type User } from '../data/mockData';
+import { type User } from '../data/types';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { users, setCurrentUser, addActivityLog, updateUser } = useAppStore();
+  const { setCurrentUser } = useAppStore();
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -88,26 +88,23 @@ export default function LoginPage() {
         sessionStorage.setItem('auth_token', data.data.token);
       }
 
-      // Fallback: ค้นหา user จาก store เพื่อ set currentUser
-      const query = emailOrUsername.trim().toLowerCase();
-      const allUsers = [...users, ...mockUsers];
-      let found: User | undefined = allUsers.find((u) => u.email.toLowerCase() === query);
-      if (!found) found = allUsers.find((u) => u.username.toLowerCase() === query);
-      if (!found) {
-        if (query === 'admin' || query.startsWith('admin@')) found = allUsers.find((u) => u.role === 'ผู้ดูแลระบบ' && u.status === 'ใช้งาน');
-        else if (query === 'approver' || query.startsWith('approver@')) found = allUsers.find((u) => u.role === 'ผู้อนุมัติ' && u.status === 'ใช้งาน');
-        else if (query === 'staff' || query.startsWith('staff@')) found = allUsers.find((u) => u.role === 'เจ้าหน้าที่' && u.status === 'ใช้งาน');
-      }
-
-      if (found) {
-        setCurrentUser(found);
-        addActivityLog({
-          action: 'เข้าสู่ระบบ',
-          description: `${found.fullName} (${found.role}) เข้าสู่ระบบสำเร็จ`,
-          userName: found.fullName,
-          module: 'ระบบ',
-          type: 'เข้าสู่ระบบ',
-        });
+      // ใช้ข้อมูล user จาก API response ตรงๆ
+      const loginUser = data.data?.user;
+      if (loginUser) {
+        const userForStore: User = {
+          id: loginUser.id,
+          fullName: loginUser.fullName,
+          username: loginUser.username,
+          email: loginUser.email,
+          department: loginUser.department,
+          role: loginUser.role,
+          status: loginUser.status,
+          avatar: loginUser.avatar || loginUser.fullName.slice(0, 2),
+          phone: loginUser.phone || '',
+          lastLogin: new Date().toLocaleString('th-TH'),
+          createdAt: '',
+        };
+        setCurrentUser(userForStore);
       }
 
       setTimeout(() => {

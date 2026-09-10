@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from '../components/AppLayout';
 import StatsCard from '../components/StatsCard';
 import Modal from '../components/Modal';
@@ -14,7 +14,8 @@ import {
   Trash2,
   Search,
 } from 'lucide-react';
-import { Category } from '../data/mockData';
+import { Category, Material } from '../data/types';
+import { api } from '@/lib/api-client';
 
 import AccessDenied from '../components/AccessDenied';
 
@@ -28,7 +29,10 @@ const emptyCategory: { name: string; description: string; icon: string; status: 
 const iconOptions = ['📋', '⚡', '🏗️', '🔧', '💻', '🧹', '🌱', '🚗', '📦', '🛠️', '🔩', '💡'];
 
 export default function CategoriesPage() {
-  const { categories, materials, addCategory, updateCategory, deleteCategory, currentUser } = useAppStore();
+  const { currentUser } = useAppStore();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -36,6 +40,23 @@ export default function CategoriesPage() {
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState(emptyCategory);
   const { showToast, ToastComponent } = useToast();
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    const [catRes, matRes] = await Promise.all([
+      api.categories.getAll(),
+      api.materials.getAll()
+    ]);
+    if (catRes.success && catRes.data) setCategories(catRes.data);
+    if (matRes.success && matRes.data) setMaterials(matRes.data);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    if (currentUser.role === 'ผู้ดูแลระบบ') {
+      fetchData();
+    }
+  }, [currentUser]);
 
   if (currentUser.role !== 'ผู้ดูแลระบบ') {
     return (
@@ -52,7 +73,7 @@ export default function CategoriesPage() {
   );
 
   const activeCategories = categories.filter((c) => c.status === 'ใช้งาน').length;
-  const totalItems = materials.length;
+  const totalItems = categories.reduce((sum, c) => sum + (c.itemCount || 0), 0);
 
   const handleAdd = () => {
     setEditingCategory(null);
@@ -71,26 +92,41 @@ export default function CategoriesPage() {
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name) {
       showToast('กรุณากรอกชื่อหมวดหมู่', 'error');
       return;
     }
 
     if (editingCategory) {
-      updateCategory(editingCategory.id, formData);
-      showToast('แก้ไขหมวดหมู่สำเร็จ', 'success');
+      const res = await api.categories.update(editingCategory.id, formData);
+      if (res.success) {
+        showToast('แก้ไขหมวดหมู่สำเร็จ', 'success');
+        fetchData();
+      } else {
+        showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+      }
     } else {
-      addCategory(formData);
-      showToast('เพิ่มหมวดหมู่ใหม่สำเร็จ', 'success');
+      const res = await api.categories.create(formData);
+      if (res.success) {
+        showToast('เพิ่มหมวดหมู่ใหม่สำเร็จ', 'success');
+        fetchData();
+      } else {
+        showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+      }
     }
     setIsModalOpen(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingCategory) {
-      deleteCategory(deletingCategory.id);
-      showToast('ลบหมวดหมู่สำเร็จ', 'success');
+      const res = await api.categories.delete(deletingCategory.id);
+      if (res.success) {
+        showToast('ลบหมวดหมู่สำเร็จ', 'success');
+        fetchData();
+      } else {
+        showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+      }
       setIsDeleteModalOpen(false);
       setDeletingCategory(null);
     }
@@ -149,7 +185,7 @@ export default function CategoriesPage() {
       {/* Grid of Categories */}
       <div className="category-grid">
         {filteredCategories.map((category) => {
-          const itemCount = materials.filter((m) => m.categoryId === category.id || m.categoryName === category.name).length;
+          const itemCount = materials.filter((m: Material) => m.categoryId === category.id || m.categoryName === category.name).length;
           return (
             <div key={category.id} className="category-card">
               <div className="category-icon">{category.icon}</div>

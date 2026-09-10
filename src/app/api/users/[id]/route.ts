@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, UpdateUserDto } from '@/lib/types/api';
-import { User } from '@/app/data/mockData';
+import { User } from '@/app/data/types';
 
 export async function GET(
   _req: NextRequest,
@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const user = serverRepository.getUserById(id);
+    const user = await prismaRepository.getUserById(id);
 
     if (!user) {
       return NextResponse.json<ApiResponse>(
@@ -39,7 +39,7 @@ export async function PUT(
     const { id } = await params;
     const body = (await req.json()) as UpdateUserDto;
 
-    const updatedUser = serverRepository.updateUser(id, body);
+    const updatedUser = await prismaRepository.updateUser(id, body);
     if (!updatedUser) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: 'ไม่พบข้อมูลผู้ใช้ที่ต้องการแก้ไข' },
@@ -67,7 +67,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const ok = serverRepository.deleteUser(id);
+    const ok = await prismaRepository.deleteUser(id);
 
     if (!ok) {
       return NextResponse.json<ApiResponse>(

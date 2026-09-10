@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from '../components/AppLayout';
 import StatsCard from '../components/StatsCard';
 import Modal from '../components/Modal';
@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   MessageSquareWarning,
 } from 'lucide-react';
+import { api } from '@/lib/api-client';
 
 const presetRejectReasons = [
   'จำนวนสต็อกคงเหลือไม่เพียงพอต่อการจัดสรร',
@@ -33,7 +34,9 @@ const presetRejectReasons = [
 import AccessDenied from '../components/AccessDenied';
 
 export default function ApprovalsPage() {
-  const { requests, approveRequest, rejectRequest, cancelRequest, currentUser } = useAppStore();
+  const { currentUser } = useAppStore();
+  const [requests, setRequests] = useState<EnhancedRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('');
   const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
@@ -42,6 +45,19 @@ export default function ApprovalsPage() {
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const { showToast, ToastComponent } = useToast();
+
+  const fetchRequests = async () => {
+    setIsLoading(true);
+    const res = await api.requests.getAll();
+    if (res.success && res.data) setRequests(res.data);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    if (currentUser.role === 'ผู้อนุมัติ') {
+      fetchRequests();
+    }
+  }, [currentUser]);
 
   if (currentUser.role !== 'ผู้อนุมัติ') {
     return (
@@ -71,9 +87,14 @@ export default function ApprovalsPage() {
   const approvedCount = requests.filter((a) => a.status === 'อนุมัติแล้ว' || a.status === 'กำลังยืม' || a.status === 'คืนแล้ว').length;
   const rejectedCount = requests.filter((a) => a.status === 'ไม่อนุมัติ').length;
 
-  const handleApprove = (id: string) => {
-    approveRequest(id);
-    showToast('อนุมัติคำขอและตัดยอดสต็อกเรียบร้อยแล้ว', 'success');
+  const handleApprove = async (id: string) => {
+    const res = await api.requests.approve(id, { approverId: currentUser.id });
+    if (res.success) {
+      showToast('อนุมัติคำขอและตัดยอดสต็อกเรียบร้อยแล้ว', 'success');
+      fetchRequests();
+    } else {
+      showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+    }
     setIsDetailModalOpen(false);
   };
 
@@ -83,15 +104,24 @@ export default function ApprovalsPage() {
     setIsRejectModalOpen(true);
   };
 
-  const handleConfirmReject = () => {
+  const handleConfirmReject = async () => {
     if (!selectedApproval) return;
     if (!rejectReason.trim()) {
       showToast('กรุณาระบุเหตุผลในการไม่อนุมัติ', 'error');
       return;
     }
 
-    rejectRequest(selectedApproval.id, rejectReason.trim());
-    showToast(`ไม่อนุมัติคำขอ ${selectedApproval.requestCode} พร้อมบันทึกเหตุผลเรียบร้อยแล้ว`, 'info');
+    const res = await api.requests.reject(selectedApproval.id, { 
+      reason: rejectReason.trim(),
+      approverId: currentUser.id 
+    });
+
+    if (res.success) {
+      showToast(`ไม่อนุมัติคำขอ ${selectedApproval.requestCode} พร้อมบันทึกเหตุผลเรียบร้อยแล้ว`, 'info');
+      fetchRequests();
+    } else {
+      showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+    }
     setIsRejectModalOpen(false);
     setIsDetailModalOpen(false);
   };

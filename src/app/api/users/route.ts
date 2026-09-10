@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, CreateUserDto } from '@/lib/types/api';
-import { User } from '@/app/data/mockData';
+import { User } from '@/app/data/types';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     const role = searchParams.get('role') || undefined;
     const department = searchParams.get('department') || undefined;
 
-    const users = serverRepository.getUsers({ search, role, department });
+    const users = await prismaRepository.getUsers({ search, role, department });
 
     return NextResponse.json<ApiResponse<User[]>>({
       success: true,
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const existing = serverRepository.getUserByUsername(body.username);
+    const existing = await prismaRepository.getUserByUsername(body.username);
     if (existing) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: 'ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว' },
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newUser = serverRepository.createUser(body);
+    const newUser = await prismaRepository.createUser(body);
 
     return NextResponse.json<ApiResponse<User>>(
       {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, UpdateMaterialDto } from '@/lib/types/api';
-import { Material } from '@/app/data/mockData';
+import { Material } from '@/app/data/types';
 
 export async function GET(
   _req: NextRequest,
@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const material = serverRepository.getMaterialById(id);
+    const material = await prismaRepository.getMaterialById(id);
 
     if (!material) {
       return NextResponse.json<ApiResponse>(
@@ -39,7 +39,7 @@ export async function PUT(
     const { id } = await params;
     const body = (await req.json()) as UpdateMaterialDto;
 
-    const updatedMaterial = serverRepository.updateMaterial(id, body);
+    const updatedMaterial = await prismaRepository.updateMaterial(id, body);
     if (!updatedMaterial) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: 'ไม่พบวัสดุที่ต้องการแก้ไข' },
@@ -67,7 +67,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const ok = serverRepository.deleteMaterial(id);
+    const ok = await prismaRepository.deleteMaterial(id);
 
     if (!ok) {
       return NextResponse.json<ApiResponse>(

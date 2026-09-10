@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, UpdateCategoryDto } from '@/lib/types/api';
-import { Category } from '@/app/data/mockData';
+import { Category } from '@/app/data/types';
 
 export async function GET(
   _req: NextRequest,
@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const category = serverRepository.getCategoryById(id);
+    const category = await prismaRepository.getCategoryById(id);
 
     if (!category) {
       return NextResponse.json<ApiResponse>(
@@ -39,7 +39,7 @@ export async function PUT(
     const { id } = await params;
     const body = (await req.json()) as UpdateCategoryDto;
 
-    const updatedCategory = serverRepository.updateCategory(id, body);
+    const updatedCategory = await prismaRepository.updateCategory(id, body);
     if (!updatedCategory) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: 'ไม่พบหมวดหมู่ที่ต้องการแก้ไข' },
@@ -67,7 +67,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const ok = serverRepository.deleteCategory(id);
+    const ok = await prismaRepository.deleteCategory(id);
 
     if (!ok) {
       return NextResponse.json<ApiResponse>(

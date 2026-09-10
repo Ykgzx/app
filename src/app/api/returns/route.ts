@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, ProcessReturnDto } from '@/lib/types/api';
-import { ReturnRecord } from '@/app/data/store';
 
 export async function GET() {
   try {
-    const records = serverRepository.getReturnRecords();
-    return NextResponse.json<ApiResponse<ReturnRecord[]>>({
+    const records = await prismaRepository.getReturnRecords();
+    return NextResponse.json<ApiResponse<typeof records>>({
       success: true,
       data: records,
       total: records.length,
@@ -38,7 +37,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const returnRecord = serverRepository.processReturn(body);
+    const returnRecord = await prismaRepository.processReturn(body);
 
     if (!returnRecord) {
       return NextResponse.json<ApiResponse>(
@@ -47,7 +46,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json<ApiResponse<ReturnRecord>>(
+    return NextResponse.json<ApiResponse<typeof returnRecord>>(
       {
         success: true,
         message: 'บันทึกการส่งคืนวัสดุและปรับปรุงสต็อกสำเร็จ',

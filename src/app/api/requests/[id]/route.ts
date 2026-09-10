@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse } from '@/lib/types/api';
-import { EnhancedRequest } from '@/app/data/store';
 
 export async function GET(
   _req: NextRequest,
@@ -9,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const request = serverRepository.getRequestById(id);
+    const request = await prismaRepository.getRequestById(id);
 
     if (!request) {
       return NextResponse.json<ApiResponse>(
@@ -18,7 +17,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json<ApiResponse<EnhancedRequest>>({
+    return NextResponse.json<ApiResponse<typeof request>>({
       success: true,
       data: request,
     });

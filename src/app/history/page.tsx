@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from '../components/AppLayout';
 import StatsCard from '../components/StatsCard';
 import { useAppStore } from '../data/store';
+import { api } from '@/lib/api-client';
+import { ActivityLog } from '../data/types';
 import {
   History,
   Search,
@@ -15,11 +17,26 @@ import {
 import AccessDenied from '../components/AccessDenied';
 
 export default function HistoryPage() {
-  const { activityLogs, currentUser } = useAppStore();
+  const { currentUser } = useAppStore();
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterModule, setFilterModule] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+
+  const fetchLogs = async () => {
+    setIsLoading(true);
+    const res = await api.logs.getAll();
+    if (res.success && res.data) setActivityLogs(res.data);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    if (currentUser.role === 'ผู้ดูแลระบบ') {
+      fetchLogs();
+    }
+  }, [currentUser]);
 
   if (currentUser.role !== 'ผู้ดูแลระบบ') {
     return (

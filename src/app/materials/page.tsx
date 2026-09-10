@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from '../components/AppLayout';
 import StatsCard from '../components/StatsCard';
 import Modal from '../components/Modal';
@@ -20,7 +20,8 @@ import {
   PlusCircle,
   Eye,
 } from 'lucide-react';
-import { Material } from '../data/mockData';
+import { Material, Category } from '../data/types';
+import { api } from '@/lib/api-client';
 
 const emptyMaterial = {
   code: '',
@@ -51,7 +52,10 @@ const units = ['ชิ้น', 'อัน', 'ตัว', 'รีม', 'ด้า
 import AccessDenied from '../components/AccessDenied';
 
 export default function MaterialsPage() {
-  const { materials, categories, addMaterial, updateMaterial, deleteMaterial, restockMaterial, currentUser } = useAppStore();
+  const { currentUser } = useAppStore();
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -68,6 +72,23 @@ export default function MaterialsPage() {
   const [formData, setFormData] = useState(emptyMaterial);
   const [selectedImageEmoji, setSelectedImageEmoji] = useState('📦');
   const { showToast, ToastComponent } = useToast();
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    const [matRes, catRes] = await Promise.all([
+      api.materials.getAll(),
+      api.categories.getAll(),
+    ]);
+    if (matRes.success && matRes.data) setMaterials(matRes.data);
+    if (catRes.success && catRes.data) setCategories(catRes.data);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    if (currentUser.role !== 'เจ้าหน้าที่') {
+      fetchData();
+    }
+  }, [currentUser]);
 
   const handleOpenDetail = (material: Material) => {
     setSelectedDetailMaterial(material);
@@ -135,46 +156,62 @@ export default function MaterialsPage() {
     setIsRestockModalOpen(true);
   };
 
-  const handleConfirmRestock = () => {
+  const handleConfirmRestock = async () => {
     if (!selectedForRestock) return;
     if (restockQty <= 0) {
       showToast('จำนวนต้องมากกว่า 0', 'error');
       return;
     }
 
-    restockMaterial(selectedForRestock.id, restockQty, restockReason);
-    showToast(`เติมสต็อก ${selectedForRestock.name} จำนวน +${restockQty} ${selectedForRestock.unit} เรียบร้อยแล้ว`, 'success');
+    const res = await api.materials.restock(selectedForRestock.id, {
+      addQuantity: restockQty,
+      reason: restockReason
+    });
+
+    if (res.success) {
+      showToast(`เติมสต็อก ${selectedForRestock.name} จำนวน +${restockQty} ${selectedForRestock.unit} เรียบร้อยแล้ว`, 'success');
+      fetchData();
+    } else {
+      showToast(res.error || 'เกิดข้อผิดพลาดในการเติมสต็อก', 'error');
+    }
     setIsRestockModalOpen(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name || !formData.code || !formData.categoryId) {
       showToast('กรุณากรอกข้อมูลให้ครบถ้วน', 'error');
       return;
     }
 
-    const category = categories.find((c) => c.id === formData.categoryId);
-
     if (editingMaterial) {
-      updateMaterial(editingMaterial.id, {
-        ...formData,
-        categoryName: category?.name || formData.categoryName,
-      });
-      showToast('แก้ไขข้อมูลวัสดุสำเร็จ', 'success');
+      const res = await api.materials.update(editingMaterial.id, formData);
+      if (res.success) {
+        showToast('แก้ไขข้อมูลวัสดุสำเร็จ', 'success');
+        fetchData();
+      } else {
+        showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+      }
     } else {
-      addMaterial({
-        ...formData,
-        categoryName: category?.name || '',
-      });
-      showToast('เพิ่มวัสดุใหม่สำเร็จ', 'success');
+      const res = await api.materials.create(formData);
+      if (res.success) {
+        showToast('เพิ่มวัสดุใหม่สำเร็จ', 'success');
+        fetchData();
+      } else {
+        showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+      }
     }
     setIsModalOpen(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingMaterial) {
-      deleteMaterial(deletingMaterial.id);
-      showToast('ลบวัสดุสำเร็จ', 'success');
+      const res = await api.materials.delete(deletingMaterial.id);
+      if (res.success) {
+        showToast('ลบวัสดุสำเร็จ', 'success');
+        fetchData();
+      } else {
+        showToast(res.error || 'เกิดข้อผิดพลาด', 'error');
+      }
       setIsDeleteModalOpen(false);
       setDeletingMaterial(null);
     }

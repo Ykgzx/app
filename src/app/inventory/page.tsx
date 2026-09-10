@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from '../components/AppLayout';
 import StatsCard from '../components/StatsCard';
 import Modal from '../components/Modal';
@@ -21,10 +21,13 @@ import {
   Calendar,
   Tag,
 } from 'lucide-react';
-import { Material, presetMaterialIcons } from '../data/mockData';
+import { Material, presetMaterialIcons } from '../data/types';
+import { api } from '@/lib/api-client';
 
 export default function InventoryPage() {
-  const { materials, restockMaterial, currentUser } = useAppStore();
+  const { currentUser } = useAppStore();
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const isAdmin = currentUser.role === 'ผู้ดูแลระบบ';
   const [filterStatus, setFilterStatus] = useState('');
@@ -35,6 +38,17 @@ export default function InventoryPage() {
   const [restockQty, setRestockQty] = useState(10);
   const [restockReason, setRestockReason] = useState('เติมสต็อกด่วนเนื่องจากใกล้หมด');
   const { showToast, ToastComponent } = useToast();
+
+  const fetchMaterials = async () => {
+    setIsLoading(true);
+    const res = await api.materials.getAll();
+    if (res.success && res.data) setMaterials(res.data);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchMaterials();
+  }, []);
 
   const handleOpenDetail = (material: Material) => {
     setSelectedDetailMaterial(material);
@@ -73,15 +87,24 @@ export default function InventoryPage() {
     setIsRestockModalOpen(true);
   };
 
-  const handleConfirmRestock = () => {
+  const handleConfirmRestock = async () => {
     if (!selectedMaterial) return;
     if (restockQty <= 0) {
       showToast('จำนวนต้องมากกว่า 0', 'error');
       return;
     }
 
-    restockMaterial(selectedMaterial.id, restockQty, restockReason);
-    showToast(`เติมสต็อก ${selectedMaterial.name} จำนวน +${restockQty} ${selectedMaterial.unit} เรียบร้อยแล้ว`, 'success');
+    const res = await api.materials.restock(selectedMaterial.id, {
+      addQuantity: restockQty,
+      reason: restockReason
+    });
+
+    if (res.success) {
+      showToast(`เติมสต็อก ${selectedMaterial.name} จำนวน +${restockQty} ${selectedMaterial.unit} เรียบร้อยแล้ว`, 'success');
+      fetchMaterials();
+    } else {
+      showToast(res.error || 'เกิดข้อผิดพลาดในการเติมสต็อก', 'error');
+    }
     setIsRestockModalOpen(false);
   };
 

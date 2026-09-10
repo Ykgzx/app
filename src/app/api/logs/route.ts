@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, CreateActivityLogDto } from '@/lib/types/api';
-import { ActivityLog } from '@/app/data/mockData';
+import { ActivityLog } from '@/app/data/types';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     const module = searchParams.get('module') || undefined;
     const limit = searchParams.get('limit') ? Number(searchParams.get('limit')) : undefined;
 
-    const logs = serverRepository.getActivityLogs({ type, module, limit });
+    const logs = await prismaRepository.getActivityLogs({ type, module, limit });
 
     return NextResponse.json<ApiResponse<ActivityLog[]>>({
       success: true,
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newLog = serverRepository.createActivityLog(body);
+    const newLog = await prismaRepository.createActivityLog(body);
 
     return NextResponse.json<ApiResponse<ActivityLog>>(
       {

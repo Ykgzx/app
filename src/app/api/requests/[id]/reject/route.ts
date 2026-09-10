@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, RejectRequestDto } from '@/lib/types/api';
-import { EnhancedRequest } from '@/app/data/store';
 
 export async function POST(
   req: NextRequest,
@@ -18,7 +17,7 @@ export async function POST(
       );
     }
 
-    const rejected = serverRepository.rejectRequest(id, body.reason, body.approverName);
+    const rejected = await prismaRepository.rejectRequest(id, body.reason, body.approverName, body.approverId);
 
     if (!rejected) {
       return NextResponse.json<ApiResponse>(
@@ -27,7 +26,7 @@ export async function POST(
       );
     }
 
-    return NextResponse.json<ApiResponse<EnhancedRequest>>({
+    return NextResponse.json<ApiResponse<typeof rejected>>({
       success: true,
       message: `บันทึกการไม่อนุมัติคำขอ ${rejected.requestCode} พร้อมระบุเหตุผลเรียบร้อยแล้ว`,
       data: rejected,

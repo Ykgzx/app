@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverRepository } from '@/lib/server/repository';
+import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, CancelRequestDto } from '@/lib/types/api';
-import { EnhancedRequest } from '@/app/data/store';
 
 export async function POST(
   req: NextRequest,
@@ -16,7 +15,7 @@ export async function POST(
       // Body optional
     }
 
-    const cancelled = serverRepository.cancelRequest(id, body.userName);
+    const cancelled = await prismaRepository.cancelRequest(id, body.userName, body.userId);
 
     if (!cancelled) {
       return NextResponse.json<ApiResponse>(
@@ -25,7 +24,7 @@ export async function POST(
       );
     }
 
-    return NextResponse.json<ApiResponse<EnhancedRequest>>({
+    return NextResponse.json<ApiResponse<typeof cancelled>>({
       success: true,
       message: `ยกเลิกคำขอ ${cancelled.requestCode} เรียบร้อยแล้ว`,
       data: cancelled,

@@ -223,11 +223,12 @@ export const prismaRepository = {
     const where: Record<string, unknown> = {};
 
     if (query?.search) {
+      const s = query.search.toLowerCase();
       where.OR = [
-        { first_name: { contains: query.search, mode: 'insensitive' } },
-        { last_name: { contains: query.search, mode: 'insensitive' } },
-        { username: { contains: query.search, mode: 'insensitive' } },
-        { email: { contains: query.search, mode: 'insensitive' } },
+        { first_name: { contains: s } },
+        { last_name: { contains: s } },
+        { username: { contains: s } },
+        { email: { contains: s } },
       ];
     }
     if (query?.role) where.role = { role_name: query.role };
@@ -254,13 +255,15 @@ export const prismaRepository = {
 
     // 1. Exact email match
     let user = await prisma.user.findFirst({
-      where: { email: { equals: query, mode: 'insensitive' } },
+      where: { email: query },
+      include: userInclude
     });
     if (user) return mapUser(user);
 
     // 2. Exact username match
     user = await prisma.user.findFirst({
-      where: { username: { equals: query, mode: 'insensitive' } },
+      where: { username: query },
+      include: userInclude
     });
     if (user) return mapUser(user);
 
@@ -495,11 +498,12 @@ export const prismaRepository = {
     const where: Record<string, unknown> = {};
 
     if (query?.search) {
+      const s = query.search.toLowerCase();
       where.OR = [
-        { material_name: { contains: query.search, mode: 'insensitive' } },
-        { material_code: { contains: query.search, mode: 'insensitive' } },
-        { category: { category_name: { contains: query.search, mode: 'insensitive' } } },
-        { location: { contains: query.search, mode: 'insensitive' } },
+        { material_name: { contains: s } },
+        { material_code: { contains: s } },
+        { category: { category_name: { contains: s } } },
+        { location: { contains: s } },
       ];
     }
     if (query?.categoryId) where.category_id = Number(query.categoryId);
@@ -1017,12 +1021,12 @@ export const prismaRepository = {
     const query = identifier.trim().toLowerCase();
 
     let user: any = await prisma.user.findFirst({
-      where: { email: { equals: query, mode: 'insensitive' } },
+      where: { email: query },
       include: userInclude
     });
     if (!user) {
       user = await prisma.user.findFirst({
-        where: { username: { equals: query, mode: 'insensitive' } },
+        where: { username: query },
         include: userInclude
       });
     }

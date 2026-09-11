@@ -164,11 +164,11 @@ async function main() {
   // =============================================
   console.log('📁 สร้างหมวดหมู่...');
   const createCategory = async (name: string, desc: string) => {
-      let cat = await prisma.category.findFirst({ where: { category_name: name } });
-      if (!cat) {
-          cat = await prisma.category.create({ data: { category_name: name, description: desc } });
-      }
-      return cat;
+    let cat = await prisma.category.findFirst({ where: { category_name: name } });
+    if (!cat) {
+      cat = await prisma.category.create({ data: { category_name: name, description: desc } });
+    }
+    return cat;
   };
   const categories = await Promise.all([
     createCategory('วัสดุสำนักงาน', 'อุปกรณ์เครื่องเขียน กระดาษ แฟ้ม และอุปกรณ์สำนักงานทั่วไป'),

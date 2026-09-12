@@ -14,41 +14,6 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const demoAccounts = [
-    {
-      role: 'ผู้ดูแลระบบ',
-      roleBadge: '1) ผู้ดูแลระบบ (Administrator)',
-      email: 'admin@rangsit.go.th',
-      name: 'สมชาย ใจดี',
-      department: 'กองช่าง',
-      icon: ShieldCheck,
-      color: '#2563eb',
-      bg: '#eff6ff',
-      border: '#93c5fd',
-    },
-    {
-      role: 'ผู้อนุมัติ',
-      roleBadge: '2) ผู้อนุมัติ (Approver)',
-      email: 'approver@rangsit.go.th',
-      name: 'ประยุทธ์ มั่นคง',
-      department: 'กองช่าง',
-      icon: UserCheck,
-      color: '#d97706',
-      bg: '#fffbeb',
-      border: '#fde68a',
-    },
-    {
-      role: 'เจ้าหน้าที่',
-      roleBadge: '3) เจ้าหน้าที่ผู้ใช้งาน (Staff)',
-      email: 'staff@rangsit.go.th',
-      name: 'วันทนา สุขกมล',
-      department: 'สำนักปลัด',
-      icon: Users,
-      color: '#0d9488',
-      bg: '#f0fdfa',
-      border: '#99f6e4',
-    },
-  ];
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,17 +81,16 @@ export default function LoginPage() {
     }
   };
 
-  const handleSelectDemoAccount = (email: string) => {
-    setEmailOrUsername(email);
-    setPassword('password123');
-    setError('');
-  };
 
   return (
     <div
       style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #0f1724 0%, #1a2332 50%, #1e3a5f 100%)',
+        background: 'linear-gradient(rgba(15, 23, 36, 0.6), rgba(30, 58, 95, 0.8)), url(/bg-rssc.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -137,10 +101,12 @@ export default function LoginPage() {
         style={{
           width: '100%',
           maxWidth: '480px',
-          background: 'white',
+          background: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(12px)',
           borderRadius: '20px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
           overflow: 'hidden',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
         }}
       >
         {/* Header */}
@@ -152,22 +118,19 @@ export default function LoginPage() {
             textAlign: 'center',
           }}
         >
-          <div
+          <img
+            src="/logo-rangsit.png"
+            alt="โลโก้เทศบาลนครรังสิต"
             style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, #c4a35a, #d4b76a)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '32px',
+              width: '96px',
+              height: '96px',
+              objectFit: 'cover',
               margin: '0 auto 16px',
-              boxShadow: '0 8px 16px rgba(196, 163, 90, 0.3)',
+              display: 'block',
+              borderRadius: '50%',
+              backgroundColor: 'white'
             }}
-          >
-            🏛️
-          </div>
+          />
           <h1 style={{ fontSize: '22px', fontWeight: 700, margin: '0 0 6px' }}>เทศบาลนครรังสิต</h1>
           <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', margin: 0 }}>
             ระบบจัดการวัสดุและครุภัณฑ์เทศบาล
@@ -250,77 +213,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Demo Accounts List */}
-          <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid #e5e7eb' }}>
-            <div
-              style={{
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#4b5563',
-                marginBottom: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-              }}
-            >
-              <Sparkles size={16} color="#d97706" /> บัญชีอีเมลสำหรับทดสอบแต่ละบทบาท:
-            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {demoAccounts.map((acc) => {
-                const Icon = acc.icon;
-                const isSelected = emailOrUsername === acc.email;
-
-                return (
-                  <button
-                    key={acc.email}
-                    type="button"
-                    onClick={() => handleSelectDemoAccount(acc.email)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '10px 14px',
-                      borderRadius: '10px',
-                      border: `1.5px solid ${isSelected ? acc.color : acc.border}`,
-                      background: isSelected ? acc.bg : '#fafafa',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'all 0.2s ease',
-                      width: '100%',
-                    }}
-                  >
-                    <Icon size={20} style={{ color: acc.color, flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>
-                        {acc.roleBadge}
-                      </div>
-                      <div style={{ fontSize: '12px', color: acc.color, fontWeight: 500, fontFamily: 'monospace' }}>
-                        {acc.email}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#6b7280' }}>
-                        {acc.name} • {acc.department}
-                      </div>
-                    </div>
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        background: isSelected ? acc.color : '#e5e7eb',
-                        color: isSelected ? 'white' : '#374151',
-                        fontWeight: 600,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {isSelected ? 'เลือกแล้ว' : 'กรอกอีเมลนี้'}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </div>
       </div>
     </div>

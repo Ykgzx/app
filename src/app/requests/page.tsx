@@ -581,9 +581,10 @@ export default function RequestsPage() {
           <label>เลือกวัสดุ/อุปกรณ์ <span className="required">*</span></label>
           <select
             className="form-control"
-            value={selectedMaterialId}
+            value={selectedMaterialId || ''}
             onChange={(e) => setSelectedMaterialId(e.target.value)}
           >
+            <option value="" disabled>-- กรุณาเลือกวัสดุ/อุปกรณ์ --</option>
             {materials.map((m) => (
               <option key={m.id} value={m.id} disabled={m.quantity <= 0}>
                 {m.code} - {m.name} (คงเหลือ: {m.quantity} {m.unit}) {m.quantity <= 0 ? '[หมดสต็อก]' : ''}

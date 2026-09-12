@@ -1,21 +1,28 @@
-// Prisma Client Singleton สำหรับ Next.js + PostgreSQL (Prisma 7)
+// Prisma Client Singleton สำหรับ Next.js + PostgreSQL
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-// สร้าง Connection Pool สำหรับ PostgreSQL
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
+const globalForPrisma = global as unknown as { prisma: PrismaClient, pool: Pool };
 
-// Singleton Pattern - ป้องกัน connection exhaustion ใน dev mode (HMR)
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
+let prisma: PrismaClient;
 
-export const prisma =
-  globalForPrisma.prisma ||
-  new PrismaClient({ adapter });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV === "production") {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const adapter = new PrismaPg(pool);
+  prisma = new PrismaClient({ adapter });
+} else {
+  if (!globalForPrisma.pool) {
+    globalForPrisma.pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  }
+  
+  if (!globalForPrisma.prisma) {
+    const adapter = new PrismaPg(globalForPrisma.pool);
+    globalForPrisma.prisma = new PrismaClient({ adapter });
+  }
+  
+  prisma = globalForPrisma.prisma;
 }
 
+export { prisma };
 export default prisma;

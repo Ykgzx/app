@@ -45,3 +45,4 @@ next-env.d.ts
 # sensitive files (contains DB credentials)
 README.md
 prisma/schema.sql
+.neon

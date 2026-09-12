@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import AppLayout, { useToast } from '../components/AppLayout';
 import StatsCard from '../components/StatsCard';
 import { useAppStore } from '../data/store';
@@ -22,26 +22,6 @@ import {
 import { api } from '@/lib/api-client';
 import { Material, ActivityLog } from '../data/types';
 import { EnhancedRequest, ReturnRecord } from '../data/store';
-
-// ข้อมูลสำหรับแผนภูมิ (จะถูกแทนที่ด้วยข้อมูลจริงจาก API ในอนาคต)
-const monthlyReportData = [
-  { month: 'ม.ค.', withdrawals: 120, value: 185000, requests: 45 },
-  { month: 'ก.พ.', withdrawals: 98, value: 142000, requests: 38 },
-  { month: 'มี.ค.', withdrawals: 135, value: 210000, requests: 52 },
-  { month: 'เม.ย.', withdrawals: 89, value: 125000, requests: 33 },
-  { month: 'พ.ค.', withdrawals: 112, value: 178000, requests: 41 },
-  { month: 'มิ.ย.', withdrawals: 145, value: 235000, requests: 55 },
-  { month: 'ก.ค.', withdrawals: 130, value: 198000, requests: 48 },
-  { month: 'ส.ค.', withdrawals: 156, value: 245000, requests: 62 },
-];
-
-const departmentUsageData = [
-  { department: 'กองช่าง', percentage: 35, value: 857500, color: '#3b82f6' },
-  { department: 'สำนักปลัด', percentage: 22, value: 539000, color: '#10b981' },
-  { department: 'กองคลัง', percentage: 15, value: 367500, color: '#f59e0b' },
-  { department: 'กองสาธารณสุข', percentage: 18, value: 441000, color: '#ef4444' },
-  { department: 'กองการศึกษา', percentage: 10, value: 245000, color: '#8b5cf6' },
-];
 
 import AccessDenied from '../components/AccessDenied';
 
@@ -73,14 +53,6 @@ export default function ReportsPage() {
     }
   }, [currentUser]);
 
-  if (currentUser.role === 'เจ้าหน้าที่') {
-    return (
-      <AppLayout title="รายงานสรุป 6 ด้าน">
-        <AccessDenied requiredRoles={['ผู้ดูแลระบบ', 'ผู้อนุมัติ']} moduleName="รายงานสรุป 6 ด้าน" />
-      </AppLayout>
-    );
-  }
-
   // 1. Requisitions
   const requisitions = requests.filter((r: EnhancedRequest) => r.requestType === 'เบิกวัสดุ');
   // 2. Borrows
@@ -96,23 +68,160 @@ export default function ReportsPage() {
 
   const totalValue = materials.reduce((sum: number, m: any) => sum + (m.quantity * (m.pricePerUnit || 0)), 0);
 
+  // คำนวณข้อมูลจากฐานข้อมูลจริง
+  const monthlyReportData = useMemo(() => {
+    const thMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    const monthData = Array(12).fill(null).map((_, i) => ({
+      month: thMonths[i],
+      withdrawals: 0,
+      value: 0,
+      requests: 0
+    }));
+
+    requests.forEach((req: EnhancedRequest) => {
+      if (!req.requestDate) return;
+      const parts = req.requestDate.split(' ');
+      if (parts.length >= 2) {
+        const monthStr = parts[1];
+        const monthIndex = thMonths.indexOf(monthStr);
+        if (monthIndex !== -1) {
+          const mat = materials.find((m: Material) => m.name === req.materialName);
+          const price = mat ? (mat.pricePerUnit || 150) : 150; // fallback price
+          const val = req.quantity * price;
+
+          monthData[monthIndex].requests += 1;
+          if (req.requestType === 'เบิกวัสดุ') {
+             monthData[monthIndex].withdrawals += 1;
+          }
+          monthData[monthIndex].value += val;
+        }
+      }
+    });
+
+    return monthData;
+  }, [requests, materials]);
+
+  const maxWithdrawals = Math.max(...monthlyReportData.map(d => d.withdrawals), 10);
+
+  const departmentUsageData = useMemo(() => {
+    const deptMap: Record<string, number> = {};
+    let deptTotalValue = 0;
+
+    requests.forEach((req: EnhancedRequest) => {
+      const mat = materials.find((m: Material) => m.name === req.materialName);
+      const price = mat ? (mat.pricePerUnit || 150) : 150;
+      const val = req.quantity * price;
+      
+      const deptName = req.department || 'ไม่ระบุ';
+      deptMap[deptName] = (deptMap[deptName] || 0) + val;
+      deptTotalValue += val;
+    });
+
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'];
+    
+    let arr = Object.keys(deptMap).map((dept) => ({
+      department: dept,
+      value: deptMap[dept],
+      percentage: deptTotalValue > 0 ? (deptMap[dept] / deptTotalValue) * 100 : 0,
+      color: ''
+    })).sort((a, b) => b.value - a.value);
+
+    // If no data, provide a default empty state
+    if (arr.length === 0) {
+      return [{ department: 'ไม่มีข้อมูล', percentage: 100, value: 0, color: '#e5e7eb' }];
+    }
+
+    return arr.map((item, index) => ({
+      ...item,
+      percentage: Math.round(item.percentage),
+      color: colors[index % colors.length]
+    }));
+  }, [requests, materials]);
+
+  const pieGradient = useMemo(() => {
+    let currentPercent = 0;
+    const parts = departmentUsageData.map((dept, index) => {
+      const start = currentPercent;
+      currentPercent += dept.percentage;
+      const end = (index === departmentUsageData.length - 1) ? 100 : currentPercent;
+      return `${dept.color} ${start}% ${end}%`;
+    });
+    return `conic-gradient(${parts.join(', ')})`;
+  }, [departmentUsageData]);
+
   const handleExportCSV = () => {
-    showToast('ระบบทำการส่งออกรายงาน Excel/CSV เรียบร้อยแล้ว', 'success');
+    let headers: string[] = [];
+    let rows: any[][] = [];
+    const filename = `report_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`;
+
+    if (activeTab === 'requisition') {
+      headers = ['รหัสคำขอ', 'ผู้ขอเบิก', 'แผนก/กอง', 'รายการวัสดุ', 'จำนวนที่ขอ', 'หน่วย', 'วันที่ขอ', 'ผู้อนุมัติ', 'สถานะ'];
+      rows = requisitions.map((r: EnhancedRequest) => [r.requestCode, r.requesterName, r.department, r.materialName, r.quantity, r.unit, r.requestDate, r.approvedBy || '-', r.status]);
+    } else if (activeTab === 'borrow') {
+      headers = ['รหัสคำขอ', 'ผู้ขอยืม', 'แผนก/กอง', 'อุปกรณ์', 'จำนวน', 'หน่วย', 'วันที่ยืม', 'กำหนดคืน', 'ผู้อนุมัติ', 'สถานะ'];
+      rows = borrows.map((r: EnhancedRequest) => [r.requestCode, r.requesterName, r.department, r.materialName, r.quantity, r.unit, r.borrowDate || r.requestDate, r.expectedReturnDate || '-', r.approvedBy || '-', r.status]);
+    } else if (activeTab === 'return') {
+      headers = ['รหัสรับคืน', 'รหัสคำขอยืม', 'ผู้ส่งคืน', 'แผนก', 'อุปกรณ์', 'จำนวนที่คืน', 'จำนวนที่ยืม', 'วันที่คืน', 'สภาพอุปกรณ์', 'ผู้ตรวจรับ'];
+      rows = returns.map((rec: ReturnRecord) => [rec.id, rec.requestCode, rec.borrowerName, rec.department, rec.materialName, rec.returnedQuantity, rec.borrowedQuantity, rec.returnDate, rec.condition, rec.receivedBy]);
+    } else if (activeTab === 'stock') {
+      headers = ['รหัส', 'ชื่อวัสดุ / ครุภัณฑ์', 'หมวดหมู่', 'คงเหลือในคลัง', 'หน่วย', 'ราคา/หน่วย', 'มูลค่ารวม (บาท)', 'สถานที่เก็บ', 'สถานะ'];
+      rows = stockItems.map((m: Material) => [m.code, m.name, m.categoryName, m.quantity, m.unit, m.pricePerUnit, m.totalValue, m.location, m.status]);
+    } else if (activeTab === 'lowstock') {
+      headers = ['รหัส', 'ชื่อวัสดุที่ต้องสั่งซื้อ', 'หมวดหมู่', 'คงเหลือปัจจุบัน', 'เกณฑ์ขั้นต่ำ', 'ขาดอีก', 'หน่วย', 'ราคาประมาณการ', 'สถานะ'];
+      rows = lowStockItems.map((m: Material) => {
+        const shortage = Math.max(0, m.minQuantity - m.quantity);
+        return [m.code, m.name, m.categoryName, m.quantity, m.minQuantity, shortage || 20, m.unit, (shortage || 20) * m.pricePerUnit, m.status];
+      });
+    } else if (activeTab === 'activity') {
+      headers = ['วัน-เวลา', 'การดำเนินการ', 'รายละเอียด', 'ผู้ใช้งาน', 'โมดูล', 'ประเภท'];
+      rows = logs.map((log: ActivityLog) => [log.timestamp, log.action, log.description, log.userName, log.module, log.type]);
+    }
+
+    const csvContent = '\uFEFF' + [headers, ...rows]
+      .map(e => e.map(item => `"${String(item).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+      
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast('ดาวน์โหลดไฟล์ Excel/CSV เรียบร้อยแล้ว', 'success');
   };
 
   const handlePrint = () => {
     window.print();
   };
 
+  if (currentUser.role === 'เจ้าหน้าที่') {
+    return (
+      <AppLayout title="รายงานสรุป 6 ด้าน">
+        <AccessDenied requiredRoles={['ผู้ดูแลระบบ', 'ผู้อนุมัติ']} moduleName="รายงานสรุป 6 ด้าน" />
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout title="ระบบรายงานและสถิติภาพรวม">
-      <div className="page-header">
+      {/* Formal Header for Print */}
+      <div className="print-header" style={{ display: 'none', textAlign: 'center', marginBottom: '20px' }}>
+        <h2 style={{ marginBottom: '10px', fontSize: '24px' }}>รายงานสรุปงบประมาณและพัสดุ</h2>
+        <p style={{ fontSize: '16px' }}>เทศบาลนครรังสิต (Rangsit Municipality)</p>
+        <p style={{ fontSize: '14px' }}>วันที่พิมพ์: {new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      </div>
+
+      <div className="page-header no-print">
         <div className="page-header-row">
           <div>
             <h1>ระบบรายงานสรุป 6 ด้าน</h1>
             <p>รายงานการเบิก, การยืม, การคืน, อุปกรณ์คงเหลือ, อุปกรณ์ใกล้หมด และประวัติการใช้งาน</p>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px' }} className="no-print">
             <button className="btn btn-outline" onClick={handlePrint}>
               <Printer size={16} /> พิมพ์รายงาน
             </button>
@@ -125,6 +234,7 @@ export default function ReportsPage() {
 
       {/* 6 Report Navigation Tabs */}
       <div
+        className="no-print"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
@@ -448,7 +558,7 @@ export default function ReportsPage() {
                     <div
                       className="chart-bar-fill"
                       style={{
-                        width: `${(data.withdrawals / 160) * 100}%`,
+                        width: `${(data.withdrawals / maxWithdrawals) * 100}%`,
                         background: 'linear-gradient(90deg, #3b82f6, #60a5fa)',
                       }}
                     >
@@ -471,13 +581,7 @@ export default function ReportsPage() {
               <div
                 className="pie-chart"
                 style={{
-                  background: `conic-gradient(
-                    ${departmentUsageData[0].color} 0% 35%,
-                    ${departmentUsageData[1].color} 35% 57%,
-                    ${departmentUsageData[2].color} 57% 72%,
-                    ${departmentUsageData[3].color} 72% 90%,
-                    ${departmentUsageData[4].color} 90% 100%
-                  )`,
+                  background: pieGradient,
                 }}
               />
               <div className="pie-legend">

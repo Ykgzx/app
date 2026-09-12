@@ -24,9 +24,10 @@ import { api } from '@/lib/api-client';
 
 import AccessDenied from '../components/AccessDenied';
 
-const emptyUser: Omit<User, 'id' | 'avatar' | 'createdAt' | 'lastLogin'> = {
+const emptyUser: Omit<User, 'id' | 'avatar' | 'createdAt' | 'lastLogin'> & { password?: string } = {
   fullName: '',
   username: '',
+  password: '',
   email: '',
   department: departments[0] || 'กองช่าง (Public Works)',
   role: 'เจ้าหน้าที่',
@@ -371,6 +372,19 @@ export default function UsersPage() {
             placeholder="เช่น somchai.j"
             value={formData.username}
             onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>
+            รหัสผ่าน {editingUser ? '(ปล่อยว่างเพื่อคงรหัสผ่านเดิม)' : <><span className="required">*</span> (หากปล่อยว่างจะใช้ password123)</>}
+          </label>
+          <input
+            type="password"
+            className="form-control"
+            placeholder={editingUser ? '••••••••' : 'เช่น password123'}
+            value={formData.password || ''}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
           />
         </div>
 

@@ -89,8 +89,8 @@ function mapMaterial(m: any) {
     unit: m.unit || 'ชิ้น',
     quantity: m.stock_quantity,
     minQuantity: m.minimum_stock,
-    pricePerUnit: 0, // Not in DB
-    totalValue: 0,
+    pricePerUnit: Number(m.price_per_unit) || 0,
+    totalValue: m.stock_quantity * (Number(m.price_per_unit) || 0),
     location: m.location || '',
     status: (m.is_active ? computeMaterialStatus(m.stock_quantity, m.minimum_stock) : 'ไม่ใช้งาน') as 'มีสต็อก' | 'ใกล้หมด' | 'หมดสต็อก',
     lastUpdated: formatThaiDate(m.updated_at),
@@ -308,12 +308,15 @@ export const prismaRepository = {
         department = await prisma.department.create({ data: { department_name: dto.department } });
     }
 
+    const { hashPassword, getDefaultPasswordHash } = await import('@/lib/auth');
+    const password_hash = dto.password ? await hashPassword(dto.password) : await getDefaultPasswordHash();
+
     const user = await prisma.user.create({
       data: {
         first_name: firstName,
         last_name: lastName,
         username: dto.username,
-        password_hash: dto.password || null,
+        password_hash,
         email: dto.email,
         department_id: department.id,
         role_id: role.id,
@@ -345,9 +348,10 @@ export const prismaRepository = {
           updateData.last_name = rest.join(' ');
           delete updateData.fullName;
       }
-      if ((dto as any).password) {
-          updateData.password_hash = (dto as any).password;
-          delete (updateData as any).password;
+      if (dto.password) {
+          const { hashPassword } = await import('@/lib/auth');
+          updateData.password_hash = await hashPassword(dto.password);
+          delete updateData.password;
       }
       if (dto.status) {
           updateData.is_active = dto.status === 'ใช้งาน';
@@ -511,7 +515,16 @@ export const prismaRepository = {
       include: { category: { select: { category_name: true } } },
       orderBy: { created_at: 'desc' },
     });
-    return materials.map(mapMaterial);
+    
+    const mapped = materials.map(mapMaterial);
+    
+    const statusPriority: Record<string, number> = { 'หมดสต็อก': 0, 'ใกล้หมด': 1, 'มีสต็อก': 2, 'ไม่ใช้งาน': 3 };
+    
+    return mapped.sort((a, b) => {
+      const priorityDiff = (statusPriority[a.status] ?? 9) - (statusPriority[b.status] ?? 9);
+      if (priorityDiff !== 0) return priorityDiff;
+      return a.code.localeCompare(b.code, 'th');
+    });
   },
 
   async getMaterialById(id: string) {
@@ -535,6 +548,7 @@ export const prismaRepository = {
         unit: dto.unit,
         stock_quantity: qty,
         minimum_stock: minQty,
+        price_per_unit: dto.pricePerUnit ? Number(dto.pricePerUnit) : 0,
         location: dto.location || 'โกดังกลาง',
         description: dto.description || null,
         is_active: isActive,
@@ -569,6 +583,7 @@ export const prismaRepository = {
       if (dto.name) updateData.material_name = dto.name;
       if (dto.categoryId) updateData.category_id = Number(dto.categoryId);
       if (dto.unit) updateData.unit = dto.unit;
+      if (dto.pricePerUnit !== undefined) updateData.price_per_unit = Number(dto.pricePerUnit);
       if (dto.location !== undefined) updateData.location = dto.location;
       if (dto.description !== undefined) updateData.description = dto.description;
 
@@ -995,6 +1010,68 @@ export const prismaRepository = {
     const outOfStockItems = materials.filter(m => m.stock_quantity === 0).length;
     const totalValue = 0; // Price per unit no longer in DB
 
+    // Fetch all requests to compute charts
+    const allRequests = await prisma.request.findMany({
+      include: {
+        user: { include: { department: true } },
+        request_items: { include: { material: true } }
+      }
+    });
+
+    // Compute monthlyReportData
+    const thMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    const monthData = Array(12).fill(null).map((_, i) => ({
+      month: thMonths[i],
+      withdrawals: 0,
+      value: 0,
+      requests: 0
+    }));
+
+    // Compute departmentUsageData
+    const deptMap: Record<string, number> = {};
+    let deptTotalValue = 0;
+
+    allRequests.forEach(req => {
+      // monthly logic
+      const reqMonth = req.created_at.getMonth(); // 0 to 11
+      const item = req.request_items[0];
+      const qty = item ? item.quantity : 0;
+      const price = (item && item.material) ? Number(item.material.price_per_unit) || 0 : 0;
+      const val = qty * price;
+
+      if (reqMonth >= 0 && reqMonth < 12) {
+        monthData[reqMonth].requests += 1;
+        if (req.request_type === 'WITHDRAW') {
+          monthData[reqMonth].withdrawals += 1;
+        }
+        monthData[reqMonth].value += val;
+      }
+
+      // department logic
+      const deptName = req.user?.department?.department_name || 'ไม่ระบุ';
+      deptMap[deptName] = (deptMap[deptName] || 0) + val;
+      deptTotalValue += val;
+    });
+
+    const monthlyReportData = monthData;
+
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'];
+    let deptArr = Object.keys(deptMap).map(dept => ({
+      department: dept,
+      value: deptMap[dept],
+      percentage: deptTotalValue > 0 ? (deptMap[dept] / deptTotalValue) * 100 : 0,
+    })).sort((a, b) => b.value - a.value);
+
+    if (deptArr.length === 0) {
+      deptArr = [{ department: 'ไม่มีข้อมูล', value: 0, percentage: 100 }];
+    }
+
+    const departmentUsageData = deptArr.map((item, index) => ({
+      ...item,
+      percentage: Math.round(item.percentage),
+      color: colors[index % colors.length]
+    }));
+
     return {
       totalUsers,
       activeUsers,
@@ -1007,6 +1084,8 @@ export const prismaRepository = {
       activeBorrows,
       recentRequests: recentRequests.map(mapRequest),
       recentLogs: recentLogs.map(mapActivityLog),
+      monthlyReportData,
+      departmentUsageData,
     };
   },
 

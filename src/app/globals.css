@@ -1122,10 +1122,12 @@ textarea.form-control {
 }
 
 .chart-placeholder {
-  height: 260px;
+  height: 320px;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding-right: 8px;
 }
 
 .chart-bar-container {
@@ -1177,6 +1179,8 @@ textarea.form-control {
   align-items: center;
   gap: 24px;
   padding: 12px;
+  height: 320px;
+  overflow-y: auto;
 }
 
 .pie-chart {
@@ -1679,4 +1683,145 @@ textarea.form-control {
 .toast-info {
   background: var(--primary-600);
   color: white;
+}
+
+/* =============================================
+   Print Styles for Official Reports
+   ============================================= */
+@media print {
+  /* Hide unnecessary UI elements */
+  .sidebar,
+  .header,
+  .no-print,
+  button,
+  .toast {
+    display: none !important;
+  }
+
+  /* Set page to landscape to fit table columns */
+  @page {
+    size: landscape;
+    margin: 1cm;
+  }
+
+  /* Force background colors and gradients to print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Reset layout to full page */
+  .app-layout {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background-color: white !important;
+  }
+  
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-height: auto !important;
+    background-color: white !important;
+  }
+
+  .page-content {
+    padding: 0 !important;
+    margin: 0 !important;
+    background-color: white !important;
+  }
+
+  /* Remove backgrounds, shadows, and borders that waste ink */
+  body, html, .app-layout, .main-content, .card, .table-container, .report-card {
+    background: transparent !important;
+    box-shadow: none !important;
+    color: black !important;
+  }
+
+  .card {
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  /* Show the print header */
+  .print-header {
+    display: block !important;
+  }
+
+  /* Optimize Typography */
+  body {
+    font-size: 12pt;
+    font-family: 'Sarabun', sans-serif !important;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: black !important;
+    page-break-after: avoid;
+  }
+
+  /* Optimize Table */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    border: 1px solid #000 !important;
+  }
+
+  th, td {
+    border: 1px solid #000 !important;
+    padding: 6px 8px !important;
+    color: black !important;
+    font-size: 11pt !important;
+  }
+
+  th {
+    background-color: #f3f4f6 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    font-weight: bold !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+  }
+
+  /* Badges - simple text with border */
+  .badge {
+    border: 1px solid #000;
+    background: transparent !important;
+    color: black !important;
+    padding: 2px 6px !important;
+  }
+  .badge::before {
+    display: none !important;
+  }
+
+  /* Keep Summary Cards neatly aligned in print */
+  .report-summary-grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 16px !important;
+    margin-bottom: 24px !important;
+    page-break-inside: avoid !important;
+  }
+  
+  .report-card {
+    flex: 1 1 calc(25% - 16px) !important;
+    border: 1px solid #000 !important;
+    padding: 12px !important;
+    border-radius: 0 !important;
+  }
+
+  /* Force page breaks if needed */
+  .dashboard-grid {
+    page-break-before: always !important;
+  }
+  
+  /* Expand charts in print view */
+  .chart-placeholder,
+  .pie-chart-container {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
 }

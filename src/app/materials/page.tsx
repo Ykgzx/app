@@ -105,15 +105,23 @@ export default function MaterialsPage() {
 
   const isAdmin = currentUser.role === 'ผู้ดูแลระบบ';
 
-  const filteredMaterials = materials.filter((m) => {
-    const matchSearch =
-      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchCategory = filterCategory ? m.categoryId === filterCategory : true;
-    const matchStatus = filterStatus ? m.status === filterStatus : true;
-    return matchSearch && matchCategory && matchStatus;
-  });
+  const statusPriority: Record<string, number> = { 'หมดสต็อก': 0, 'ใกล้หมด': 1, 'มีสต็อก': 2, 'ไม่ใช้งาน': 3 };
+
+  const filteredMaterials = materials
+    .filter((m) => {
+      const matchSearch =
+        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.location.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchCategory = filterCategory ? m.categoryId === filterCategory : true;
+      const matchStatus = filterStatus ? m.status === filterStatus : true;
+      return matchSearch && matchCategory && matchStatus;
+    })
+    .sort((a, b) => {
+      const priorityDiff = (statusPriority[a.status] ?? 9) - (statusPriority[b.status] ?? 9);
+      if (priorityDiff !== 0) return priorityDiff;
+      return a.code.localeCompare(b.code, 'th');
+    });
 
   const totalMaterials = materials.length;
   const lowStock = materials.filter((m) => m.status === 'ใกล้หมด').length;

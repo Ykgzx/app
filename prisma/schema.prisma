@@ -2,7 +2,8 @@
 // ปรับให้ตรงกับโครงสร้างฐานข้อมูลจริง
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl", "linux-musl-openssl-3.0.x", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -122,6 +123,7 @@ model Material {
   unit           String?  @db.VarChar(50)
   stock_quantity Int      @default(0)
   minimum_stock  Int      @default(0)
+  price_per_unit Float    @default(0.0)
   image_url      String?  @db.Text
   location       String?  @db.VarChar(255)
   is_active      Boolean  @default(true)

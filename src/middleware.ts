@@ -85,8 +85,7 @@ export function middleware(request: NextRequest) {
       }
 
       // Decode payload (base64url)
-      const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const payloadJson = atob(payloadBase64);
+      const payloadJson = Buffer.from(parts[1], 'base64').toString('utf-8');
       const payload = JSON.parse(payloadJson);
 
       if (!payload.userId || !payload.role) {
@@ -127,7 +126,7 @@ export function middleware(request: NextRequest) {
       // เพิ่ม user info ลง header เพื่อให้ API routes ใช้ได้
       const requestHeaders = new Headers(request.headers);
       requestHeaders.set('x-user-id', payload.userId);
-      requestHeaders.set('x-user-role', payload.role);
+      requestHeaders.set('x-user-role', encodeURIComponent(payload.role || ''));
       requestHeaders.set('x-user-name', encodeURIComponent(payload.username || ''));
 
       return NextResponse.next({
@@ -135,9 +134,9 @@ export function middleware(request: NextRequest) {
           headers: requestHeaders,
         },
       });
-    } catch {
+    } catch (err: any) {
       return NextResponse.json(
-        { success: false, error: 'Token ไม่ถูกต้อง กรุณาเข้าสู่ระบบใหม่' },
+        { success: false, error: 'Token Error: ' + err.message },
         { status: 401 }
       );
     }

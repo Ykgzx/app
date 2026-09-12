@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from './components/AppLayout';
 import StatsCard from './components/StatsCard';
 import { useAppStore } from './data/store';
@@ -18,26 +18,9 @@ import {
   ShieldCheck,
   ArrowRight,
 } from 'lucide-react';
+import { api } from '@/lib/api-client';
 
-// ข้อมูลสำหรับแผนภูมิ (จะถูกแทนที่ด้วยข้อมูลจริงจาก API ในอนาคต)
-const monthlyReportData = [
-  { month: 'ม.ค.', withdrawals: 120, value: 185000, requests: 45 },
-  { month: 'ก.พ.', withdrawals: 98, value: 142000, requests: 38 },
-  { month: 'มี.ค.', withdrawals: 135, value: 210000, requests: 52 },
-  { month: 'เม.ย.', withdrawals: 89, value: 125000, requests: 33 },
-  { month: 'พ.ค.', withdrawals: 112, value: 178000, requests: 41 },
-  { month: 'มิ.ย.', withdrawals: 145, value: 235000, requests: 55 },
-  { month: 'ก.ค.', withdrawals: 130, value: 198000, requests: 48 },
-  { month: 'ส.ค.', withdrawals: 156, value: 245000, requests: 62 },
-];
 
-const departmentUsageData = [
-  { department: 'กองช่าง', percentage: 35, value: 857500, color: '#3b82f6' },
-  { department: 'สำนักปลัด', percentage: 22, value: 539000, color: '#10b981' },
-  { department: 'กองคลัง', percentage: 15, value: 367500, color: '#f59e0b' },
-  { department: 'กองสาธารณสุข', percentage: 18, value: 441000, color: '#ef4444' },
-  { department: 'กองการศึกษา', percentage: 10, value: 245000, color: '#8b5cf6' },
-];
 
 export default function DashboardPage() {
   const { currentUser } = useAppStore();
@@ -51,16 +34,20 @@ export default function DashboardPage() {
     outOfStockItems: 0,
     activeBorrows: 0,
     recentLogs: [] as { id: string; action: string; description: string; type: string; timestamp: string; module: string }[],
+    monthlyReportData: [] as { month: string; withdrawals: number; value: number; requests: number }[],
+    departmentUsageData: [] as { department: string; percentage: number; value: number; color: string }[],
   });
-
-  useState(() => {
-    fetch('/api/dashboard/stats')
-      .then((res) => res.json())
-      .then((res) => {
-        if (res.success && res.data) setStats(res.data);
-      })
-      .catch(() => {});
-  });
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await api.dashboard.getStats();
+        if (res.success && res.data) {
+          setStats(res.data as any);
+        }
+      } catch (err) {}
+    };
+    fetchStats();
+  }, []);
 
   const totalUsers = stats.totalUsers;
   const activeUsers = stats.activeUsers;
@@ -69,8 +56,23 @@ export default function DashboardPage() {
   const pendingApprovals = stats.pendingApprovals;
   const lowStockItems = stats.lowStockItems;
   const borrowingItems = stats.activeBorrows;
+  const monthlyReportData = stats.monthlyReportData || [];
+  const departmentUsageData = stats.departmentUsageData || [];
 
-  const maxWithdrawals = Math.max(...monthlyReportData.map((d) => d.withdrawals));
+  const maxWithdrawals = Math.max(...monthlyReportData.map((d) => d.withdrawals), 10);
+
+  const pieGradient = departmentUsageData.length > 0
+    ? (() => {
+        let currentPercent = 0;
+        const parts = departmentUsageData.map((dept, index) => {
+          const start = currentPercent;
+          currentPercent += dept.percentage;
+          const end = index === departmentUsageData.length - 1 ? 100 : currentPercent;
+          return `${dept.color} ${start}% ${end}%`;
+        });
+        return `conic-gradient(${parts.join(', ')})`;
+      })()
+    : 'conic-gradient(#e5e7eb 0% 100%)';
 
   return (
     <AppLayout title="ระบบจัดการวัสดุเทศบาล">
@@ -91,64 +93,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Welcome & Info Card */}
-      <div
-        style={{
-          background: 'linear-gradient(135deg, #1e3a5f, #0f1724)',
-          borderRadius: '16px',
-          padding: '20px 24px',
-          marginBottom: '24px',
-          color: 'white',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '16px',
-          boxShadow: '0 10px 25px rgba(15, 23, 36, 0.2)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div
-            style={{
-              width: '52px',
-              height: '52px',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #c4a35a, #d4b76a)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '24px',
-              color: '#0f1724',
-              fontWeight: 700,
-            }}
-          >
-            🏛️
-          </div>
-          <div>
-            <div style={{ fontSize: '18px', fontWeight: 700 }}>
-              ระบบจัดการวัสดุและครุภัณฑ์ เทศบาลนครรังสิต
-            </div>
-            <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.75)' }}>
-              เข้าสู่ระบบในชื่อ: <strong style={{ color: '#93c5fd' }}>{currentUser.fullName}</strong> • บทบาท: <span style={{ color: '#fde68a', fontWeight: 600 }}>{currentUser.role}</span> ({currentUser.department})
-            </div>
-          </div>
-        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span
-            style={{
-              fontSize: '12px',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              background: 'rgba(255,255,255,0.1)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              color: '#e5e7eb',
-            }}
-          >
-            อีเมล: {currentUser.email}
-          </span>
-        </div>
-      </div>
 
       {/* Main Stats Grid */}
       <div className="stats-grid">
@@ -231,15 +176,7 @@ export default function DashboardPage() {
             <div className="pie-chart-container">
               <div
                 className="pie-chart"
-                style={{
-                  background: `conic-gradient(
-                    ${departmentUsageData[0].color} 0% ${departmentUsageData[0].percentage}%,
-                    ${departmentUsageData[1].color} ${departmentUsageData[0].percentage}% ${departmentUsageData[0].percentage + departmentUsageData[1].percentage}%,
-                    ${departmentUsageData[2].color} ${departmentUsageData[0].percentage + departmentUsageData[1].percentage}% ${departmentUsageData[0].percentage + departmentUsageData[1].percentage + departmentUsageData[2].percentage}%,
-                    ${departmentUsageData[3].color} ${departmentUsageData[0].percentage + departmentUsageData[1].percentage + departmentUsageData[2].percentage}% ${departmentUsageData[0].percentage + departmentUsageData[1].percentage + departmentUsageData[2].percentage + departmentUsageData[3].percentage}%,
-                    ${departmentUsageData[4].color} ${departmentUsageData[0].percentage + departmentUsageData[1].percentage + departmentUsageData[2].percentage + departmentUsageData[3].percentage}% 100%
-                  )`,
-                }}
+                style={{ background: pieGradient }}
               />
               <div className="pie-legend">
                 {departmentUsageData.map((dept) => (

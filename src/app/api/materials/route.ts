@@ -3,6 +3,8 @@ import { prismaRepository } from '@/lib/server/prisma-repository';
 import { ApiResponse, CreateMaterialDto } from '@/lib/types/api';
 import { Material } from '@/app/data/types';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

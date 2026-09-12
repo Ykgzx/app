@@ -59,6 +59,7 @@ export interface CreateUserDto {
 export interface UpdateUserDto {
   fullName?: string;
   username?: string;
+  password?: string;
   email?: string;
   department?: string;
   role?: UserRole;
@@ -87,10 +88,10 @@ export interface CreateMaterialDto {
   name: string;
   categoryId: string;
   categoryName?: string;
-  unit: string;
+  unit?: string;
   quantity: number;
   minQuantity?: number;
-  pricePerUnit: number;
+  pricePerUnit?: number;
   location?: string;
   description?: string;
 }

@@ -24,9 +24,14 @@ import { EnhancedRequest, ReturnRecord } from '@/app/data/store';
 
 async function fetcher<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
   try {
+    // ดึง JWT token จาก sessionStorage เพื่อส่งใน Authorization header
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('auth_token') : null;
+
     const res = await fetch(endpoint, {
+      cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options?.headers,
       },
       ...options,

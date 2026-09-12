@@ -55,7 +55,7 @@ export default function InventoryPage() {
     setIsDetailModalOpen(true);
   };
 
-  const statusPriority: Record<string, number> = { 'หมดสต็อก': 0, 'ใกล้หมด': 1, 'มีสต็อก': 2 };
+  const statusPriority: Record<string, number> = { 'หมดสต็อก': 0, 'ใกล้หมด': 1, 'มีสต็อก': 2, 'ไม่ใช้งาน': 3 };
 
   const filteredMaterials = materials
     .filter((m) => {
@@ -225,6 +225,8 @@ export default function InventoryPage() {
                 <th>ระดับสต็อก</th>
                 <th>สถานที่จัดเก็บ</th>
                 <th>สถานะ</th>
+                <th>ราคา/หน่วย</th>
+                <th>มูลค่ารวม</th>
                 <th>การจัดการสต็อก</th>
               </tr>
             </thead>
@@ -266,6 +268,12 @@ export default function InventoryPage() {
                     </td>
                     <td>
                       <span className={`badge ${getStatusBadge(m.status)}`}>{m.status}</span>
+                    </td>
+                    <td style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      ฿{m.pricePerUnit.toLocaleString('th-TH')}
+                    </td>
+                    <td style={{ fontWeight: 700, color: 'var(--primary-600)' }}>
+                      ฿{m.totalValue.toLocaleString('th-TH')}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
